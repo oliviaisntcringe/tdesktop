@@ -9,8 +9,10 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 #include "apiwrap.h"
 #include "base/call_delayed.h"
+#include "base/debug_log.h"
 #include "base/event_filter.h"
 #include "base/platform/base_platform_haptic.h"
+#include "base/platform/base_platform_info.h"
 #include "data/data_chat_filters.h"
 #include "data/data_messages.h"
 #include "data/data_peer.h"
@@ -48,6 +50,29 @@ constexpr auto kPanelDuration = crl::time(320);
 constexpr auto kRetractDuration = crl::time(250);
 constexpr auto kExpandDuration = crl::time(250);
 constexpr auto kBounceDuration = crl::time(400);
+constexpr auto kIdleRelease = crl::time(200);
+
+[[nodiscard]] QString PullNextPhaseName(Qt::ScrollPhase phase) {
+	switch (phase) {
+	case Qt::NoScrollPhase: return u"None"_q;
+	case Qt::ScrollBegin: return u"Begin"_q;
+	case Qt::ScrollUpdate: return u"Update"_q;
+	case Qt::ScrollEnd: return u"End"_q;
+	case Qt::ScrollMomentum: return u"Momentum"_q;
+	}
+	return u"?"_q;
+}
+
+// Temporary reverse-over-scroll hypothesis switch: content of
+// <exe dir>/pullhyp.txt, read live. 0 = baseline.
+[[nodiscard]] int PullHypothesis() {
+	auto file = QFile(
+		QCoreApplication::applicationDirPath() + u"/pullhyp.txt"_q);
+	if (file.open(QIODevice::ReadOnly)) {
+		return file.readAll().trimmed().toInt();
+	}
+	return 0;
+}
 
 [[nodiscard]] History *FindNextUnreadChannel(
 		not_null<Window::SessionController*> controller,
@@ -570,7 +595,14 @@ PullToNextChannel::PullToNextChannel(
 , _scroll(scroll)
 , _controller(controller)
 , _indicator(base::make_unique_q<Indicator>(scroll, controller->chatStyle()))
-, _hint(base::make_unique_q<HintOverlay>(parent)) {
+, _hint(base::make_unique_q<HintOverlay>(parent))
+, _idleRelease([=] {
+	LOG(("PULLNEXT idle-timeout t=%1 eng=%2 reached=%3 off=%4 (log-only)")
+		.arg(crl::now())
+		.arg(_engaged ? 1 : 0)
+		.arg(_reached ? 1 : 0)
+		.arg(_offset));
+}) {
 }
 
 PullToNextChannel::~PullToNextChannel() = default;
@@ -610,6 +642,15 @@ bool PullToNextChannel::atBottom() const {
 
 bool PullToNextChannel::processWheel(not_null<QWheelEvent*> e) {
 	const auto phase = e->phase();
+	LOG(("PULLNEXT wheel t=%1 ph=%2 pxy=%3 pxx=%4 angy=%5 eng=%6 rch=%7 off=%8")
+		.arg(crl::now())
+		.arg(PullNextPhaseName(phase))
+		.arg(e->pixelDelta().y())
+		.arg(e->pixelDelta().x())
+		.arg(e->angleDelta().y())
+		.arg(_engaged ? 1 : 0)
+		.arg(_reached ? 1 : 0)
+		.arg(_offset));
 	if (phase == Qt::NoScrollPhase) {
 		return false;
 	} else if (phase == Qt::ScrollBegin) {
@@ -618,7 +659,8 @@ bool PullToNextChannel::processWheel(not_null<QWheelEvent*> e) {
 	} else if (phase == Qt::ScrollEnd || phase == Qt::ScrollMomentum) {
 		return release() || _retract.animating() || _swallowMomentum;
 	} else if (!_engaged
-		&& (_gaveUp
+		&& (_swallowMomentum
+			|| _gaveUp
 			|| !_history
 			|| !_history->peer->isBroadcast()
 			|| !atBottom())) {
@@ -646,6 +688,8 @@ bool PullToNextChannel::applyDelta(float64 deltaX, float64 deltaY) {
 			return true;
 		}
 		_engaged = true;
+		LOG(("PULLNEXT ENGAGE t=%1 down=%2 side=%3")
+			.arg(crl::now()).arg(down).arg(sideways));
 		_retract.stop();
 		_accumulated = down;
 		_next = FindNextUnreadChannel(_controller, _history->peer);
@@ -658,7 +702,27 @@ bool PullToNextChannel::applyDelta(float64 deltaX, float64 deltaY) {
 			PreloadPinnedBar(_next);
 		}
 	} else {
+		if (deltaY > 0. && _reached && PullHypothesis() == 4) {
+			// H4: after ready, any reverse delta cancels immediately and is
+			// consumed (tests whether the reverse reaches the gesture at all).
+			LOG(("PULLNEXT H4-cancel dy=%1 off=%2 t=%3")
+				.arg(deltaY).arg(_offset).arg(crl::now()));
+			const auto from = _accumulated;
+			const auto next = _next;
+			_swallowMomentum = true;
+			clearState();
+			startRetract(from, next);
+			return true;
+		}
 		_accumulated = std::max(0., _accumulated - deltaY);
+		if (PullHypothesis() == 5) {
+			// H5: cap the accumulator so a reverse can retract it responsively
+			// (baseline lets it run far past the log-curve saturation, so the
+			// reverse stream can never undo it).
+			const auto cap = 2. * float64(Ui::OverscrollToAccumulated(
+				int(st::historyPullNextThreshold)));
+			_accumulated = std::min(_accumulated, cap);
+		}
 	}
 	const auto threshold = float64(st::historyPullNextThreshold);
 	_offset = std::max(0., std::min(
@@ -668,13 +732,19 @@ bool PullToNextChannel::applyDelta(float64 deltaX, float64 deltaY) {
 	const auto ratio = threshold ? (_offset / threshold) : 0.;
 	if (_next && !_reached && ratio >= 1.) {
 		_reached = true;
+		LOG(("PULLNEXT REACHED=1 t=%1 off=%2").arg(crl::now()).arg(_offset));
 		base::Platform::Haptic();
 		startExpand(true);
 	} else if (_reached && ratio < kResetReachedOn) {
 		_reached = false;
+		LOG(("PULLNEXT REACHED=0 t=%1 off=%2").arg(crl::now()).arg(_offset));
 		startExpand(false);
 	}
 	push(_offset, _reached, _offset > 0., _next);
+	if (::Platform::IsWindows()) {
+		// Direct Manipulation may skip the terminal ScrollEnd on finger lift.
+		_idleRelease.callOnce(kIdleRelease);
+	}
 	return true;
 }
 
@@ -687,6 +757,8 @@ bool PullToNextChannel::release() {
 	const auto ready = (_offset >= float64(st::historyPullNextThreshold))
 		&& next
 		&& next->unreadCount() > 0;
+	LOG(("PULLNEXT RELEASE t=%1 ready=%2 off=%3 acc=%4")
+		.arg(crl::now()).arg(ready ? 1 : 0).arg(_offset).arg(fromAccumulated));
 	_swallowMomentum = true;
 	clearState();
 	if (ready) {
@@ -752,6 +824,7 @@ void PullToNextChannel::startRetract(float64 fromAccumulated, History *next) {
 }
 
 void PullToNextChannel::clearState() {
+	_idleRelease.cancel();
 	_expand.stop();
 	_accumulated = 0.;
 	_offset = 0.;
@@ -764,6 +837,7 @@ void PullToNextChannel::clearState() {
 }
 
 void PullToNextChannel::reset() {
+	LOG(("PULLNEXT reset t=%1 eng=%2").arg(crl::now()).arg(_engaged ? 1 : 0));
 	_retract.stop();
 	_swallowMomentum = false;
 	clearState();

@@ -7,6 +7,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #pragma once
 
+#include "base/timer.h"
 #include "base/unique_qptr.h"
 #include "ui/effects/animations.h"
 
@@ -65,6 +66,7 @@ private:
 	const base::unique_qptr<Indicator> _indicator;
 	const base::unique_qptr<HintOverlay> _hint;
 
+	base::Timer _idleRelease;
 	QPointer<HistoryInner> _inner;
 	History *_history = nullptr;
 	History *_next = nullptr;
