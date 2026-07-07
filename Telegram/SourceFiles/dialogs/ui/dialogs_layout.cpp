@@ -445,6 +445,15 @@ void PaintRow(
 		p.translate(-swipeTranslation, 0);
 	}
 	p.fillRect(geometry, bg);
+	if (!context.active) {
+		p.fillRect(
+			QRect(
+				geometry.x(),
+				geometry.y() + geometry.height() - st::lineWidth,
+				geometry.width(),
+				st::lineWidth),
+			st::windowSubTextFg);
+	}
 	if (!(flags & Flag::TopicJumpRipple)) {
 		auto ripple = context.active
 			? st::dialogsRippleBgActive
