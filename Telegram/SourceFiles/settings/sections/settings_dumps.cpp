@@ -54,7 +54,7 @@ void Dumps::setupContent() {
 void Dumps::refresh() {
 	const auto list = _list;
 	list->clear();
-	const auto entries = Dumps::List();
+	const auto entries = ::Dumps::List();
 	if (entries.empty()) {
 		Ui::AddDividerText(
 			list,
@@ -81,13 +81,13 @@ void Dumps::refresh() {
 				button,
 				st::popupMenuWithIcons);
 			(*menu)->addAction(u"Export CSV…"_q, [=] {
-				Dumps::ExportCsv(entry);
+				::Dumps::ExportCsv(entry);
 			}, &st::menuIconExport);
 			(*menu)->addAction(u"Open file"_q, [=] {
 				File::Launch(entry.file);
 			}, &st::menuIconShowInFolder);
 			(*menu)->addAction(u"Delete"_q, [=] {
-				Dumps::Remove(entry);
+				::Dumps::Remove(entry);
 				crl::on_main(this, [=] { refresh(); });
 			}, &st::menuIconDelete);
 			(*menu)->popup(QCursor::pos());
