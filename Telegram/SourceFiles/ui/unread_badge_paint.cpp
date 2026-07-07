@@ -125,12 +125,7 @@ void PaintUnreadBadge(QPainter &p, const QRect &rect, const UnreadBadgeStyle &st
 			bg));
 	}
 
-	int bar = rect.width() - 2 * sizehalf;
-	p.drawPixmap(rect.x(), rect.y(), badgeData->left[index]);
-	if (bar) {
-		p.fillRect(rect.x() + sizehalf, rect.y(), bar, rect.height(), bg);
-	}
-	p.drawPixmap(rect.x() + sizehalf + bar, rect.y(), badgeData->right[index]);
+	p.fillRect(rect, bg);
 }
 
 } // namespace
