@@ -653,6 +653,8 @@ PRIVATE
     data/data_download_manager.h
     data/data_drafts.cpp
     data/data_drafts.h
+    data/data_dumps.cpp
+    data/data_dumps.h
     data/data_emoji_statuses.cpp
     data/data_emoji_statuses.h
     data/data_folder.cpp
@@ -1707,6 +1709,8 @@ PRIVATE
     settings/sections/settings_blocked_peers.h
     settings/sections/settings_business.cpp
     settings/sections/settings_business.h
+    settings/sections/settings_dumps.cpp
+    settings/sections/settings_dumps.h
     settings/sections/settings_calls.cpp
     settings/sections/settings_calls.h
     settings/settings_codes.cpp

@@ -47,6 +47,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "settings/cloud_password/settings_cloud_password_input.h"
 #include "settings/sections/settings_advanced.h"
 #include "settings/sections/settings_business.h"
+#include "settings/sections/settings_dumps.h"
 #include "settings/sections/settings_calls.h"
 #include "settings/sections/settings_chat.h"
 #include "settings/settings_codes.h"
@@ -432,6 +433,13 @@ void BuildSectionButtons(SectionBuilder &builder) {
 		.targetSection = AdvancedId(),
 		.icon = { &st::menuIconManage },
 		.keywords = { u"performance"_q, u"proxy"_q, u"experimental"_q },
+	});
+
+	builder.addSectionButton({
+		.title = rpl::single(u"Dumps"_q),
+		.targetSection = DumpsId(),
+		.icon = { &st::menuIconExport },
+		.keywords = { u"dumps"_q, u"export"_q, u"csv"_q },
 	});
 
 	builder.addSectionButton({

@@ -110,6 +110,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/data_user.h"
 #include "data/data_saved_messages.h"
 #include "data/data_saved_sublist.h"
+#include "data/data_dumps.h"
 #include "data/data_histories.h"
 #include "data/data_types.h"
 #include "data/data_chat_filters.h"
@@ -275,121 +276,6 @@ void PeerMenuAddMuteSubmenuAction(
 			},
 		});
 	}
-}
-
-[[nodiscard]] QString DumpMessageLine(not_null<HistoryItem*> item) {
-	if (item->isService()) {
-		return QString();
-	}
-	const auto date = base::unixtime::parse(item->date())
-		.toString(u"yyyy-MM-dd hh:mm:ss"_q);
-	const auto author = item->from()->name();
-	const auto text = item->originalText().text;
-	return u"[%1] %2: %3"_q.arg(date, author, text);
-}
-
-void DumpDialogWriteFile(not_null<PeerData*> peer, QStringList lines) {
-	std::reverse(lines.begin(), lines.end());
-	if (lines.isEmpty()) {
-		Ui::Toast::Show(u"Nothing to dump."_q);
-		return;
-	}
-	const auto content = (lines.join('\n') + '\n').toUtf8();
-	const auto count = int(lines.size());
-	FileDialog::GetWritePath(
-		Core::App().getFileDialogParent(),
-		u"Dump dialog"_q,
-		u"Text file (*.txt)"_q,
-		u"dump_%1.txt"_q.arg(peer->id.value),
-		crl::guard(&peer->session(), [=](QString &&result) {
-			if (result.isEmpty()) {
-				return;
-			}
-			auto file = QFile(result);
-			if (!file.open(QIODevice::WriteOnly)
-				|| file.write(content) != content.size()) {
-				Ui::Toast::Show(u"Could not write dump."_q);
-				return;
-			}
-			file.close();
-			Ui::Toast::Show(u"Dumped %1 messages."_q.arg(count));
-		}));
-}
-
-void PeerMenuDumpHistory(not_null<PeerData*> peer) {
-	struct State {
-		QStringList lines;
-		MsgId offsetId = 0;
-		Fn<void()> next;
-	};
-	constexpr auto kPerPage = 100;
-	const auto state = std::make_shared<State>();
-	const auto weak = std::weak_ptr<State>(state);
-	state->next = [=] {
-		const auto strong = weak.lock();
-		if (!strong) {
-			return;
-		}
-		peer->session().api().request(MTPmessages_GetHistory(
-			peer->input(),
-			MTP_int(strong->offsetId),
-			MTP_int(0), // offset_date
-			MTP_int(0), // add_offset
-			MTP_int(kPerPage),
-			MTP_int(0), // max_id
-			MTP_int(0), // min_id
-			MTP_long(0) // hash
-		)).done([peer, state = weak.lock()](
-				const MTPmessages_Messages &result) {
-			auto &owner = peer->owner();
-			const auto grab = [&](const auto &data)
-					-> const QVector<MTPMessage>* {
-				owner.processUsers(data.vusers());
-				owner.processChats(data.vchats());
-				return &data.vmessages().v;
-			};
-			const auto list = result.match([&](
-					const MTPDmessages_messages &data) {
-				return grab(data);
-			}, [&](const MTPDmessages_messagesSlice &data) {
-				return grab(data);
-			}, [&](const MTPDmessages_channelMessages &data) {
-				return grab(data);
-			}, [&](const MTPDmessages_messagesNotModified &) {
-				return (const QVector<MTPMessage>*)nullptr;
-			});
-			if (!list || list->isEmpty()) {
-				DumpDialogWriteFile(peer, base::take(state->lines));
-				return;
-			}
-			owner.processMessages(*list, NewMessageType::Existing);
-			auto minId = MsgId(0);
-			for (const auto &message : *list) {
-				const auto id = IdFromMessage(message);
-				if (const auto item = owner.message(peer->id, id)) {
-					if (auto line = DumpMessageLine(item); !line.isEmpty()) {
-						state->lines.push_back(std::move(line));
-					}
-				}
-				if (!minId || id < minId) {
-					minId = id;
-				}
-			}
-			const auto reachedTop = (int(list->size()) < kPerPage)
-				|| !minId
-				|| (state->offsetId && minId >= state->offsetId);
-			state->offsetId = minId;
-			if (reachedTop) {
-				DumpDialogWriteFile(peer, base::take(state->lines));
-			} else {
-				state->next();
-			}
-		}).fail([peer, state = weak.lock()] {
-			DumpDialogWriteFile(peer, base::take(state->lines));
-		}).send();
-	};
-	Ui::Toast::Show(u"Exporting dialog…"_q);
-	state->next();
 }
 
 class Filler {
@@ -1085,7 +971,7 @@ void Filler::addDumpDialog() {
 	}
 	const auto peer = _peer;
 	_addAction(u"Dump dialog"_q, [=] {
-		PeerMenuDumpHistory(peer);
+		Dumps::Create(peer);
 	}, &st::menuIconExport);
 }
 
