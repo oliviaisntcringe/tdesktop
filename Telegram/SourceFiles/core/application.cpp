@@ -98,6 +98,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include <QtCore/QStandardPaths>
 #include <QtCore/QMimeDatabase>
 #include <QtGui/QGuiApplication>
+#include <QtGui/QFontDatabase>
 #include <QtGui/QScreen>
 
 #include <ksandbox.h>
@@ -269,6 +270,10 @@ void Application::run() {
 
 	startLocalStorage();
 
+	if (settings().customFontFamily().isEmpty()) {
+		settings().setCustomFontFamily(
+			QFontDatabase::systemFont(QFontDatabase::FixedFont).family());
+	}
 	style::SetCustomFont(settings().customFontFamily());
 	style::internal::StartFonts();
 
@@ -494,8 +499,21 @@ void Application::startSettingsAndBackground() {
 	Local::rewriteSettingsIfNeeded();
 	Window::Theme::Background()->start();
 	checkSystemDarkMode();
+	applyAmberThemeDefault();
 	Ui::SetScreenReaderModeDisabled(
 		settings().readPref<bool>(kScreenReaderModeDisabledKey));
+}
+
+void Application::applyAmberThemeDefault() {
+	if (settings().readPref<bool>(kAmberThemeDefaultAppliedKey)) {
+		return;
+	}
+	settings().writePref<bool>(kAmberThemeDefaultAppliedKey, true);
+	settings().setSystemDarkModeEnabled(false);
+	if (!Window::Theme::IsNightMode()) {
+		Window::Theme::ToggleNightMode();
+		Window::Theme::KeepApplied();
+	}
 }
 
 void Application::checkSystemDarkMode() {

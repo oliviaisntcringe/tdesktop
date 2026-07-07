@@ -205,6 +205,7 @@ public:
 	[[nodiscard]] bool isSharingScreen() const;
 
 	void startSettingsAndBackground();
+	void applyAmberThemeDefault();
 	[[nodiscard]] Settings &settings();
 	[[nodiscard]] const Settings &settings() const;
 	void saveSettingsDelayed(crl::time delay = kDefaultSaveDelay);

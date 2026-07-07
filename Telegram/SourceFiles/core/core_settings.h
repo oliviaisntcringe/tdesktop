@@ -39,6 +39,9 @@ namespace Core {
 inline constexpr auto kScreenReaderModeDisabledKey
 	= "screen-reader-mode-disabled"_cs;
 
+inline constexpr auto kAmberThemeDefaultAppliedKey
+	= "amber-theme-default-applied"_cs;
+
 struct WindowPosition {
 	int32 moncrc = 0;
 	int maximized = 0;
