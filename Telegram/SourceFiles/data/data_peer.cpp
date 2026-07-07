@@ -468,7 +468,7 @@ void PeerData::paintUserpic(
 			? Ui::PeerUserpicShape::Forum
 			: isMonoforum()
 			? Ui::PeerUserpicShape::Monoforum
-			: Ui::PeerUserpicShape::Circle;
+			: Ui::PeerUserpicShape::Square;
 	}
 	Ui::ValidateUserpicCache(
 		view,
@@ -1300,7 +1300,7 @@ Ui::PeerUserpicShape PeerData::userpicShape() const {
 		? Ui::PeerUserpicShape::Forum
 		: isMonoforum()
 		? Ui::PeerUserpicShape::Monoforum
-		: Ui::PeerUserpicShape::Circle;
+		: Ui::PeerUserpicShape::Square;
 }
 
 ChannelData *PeerData::monoforumBroadcast() const {

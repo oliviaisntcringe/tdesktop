@@ -31,7 +31,7 @@ void ValidateUserpicCache(
 
 	const auto full = QSize(size, size);
 	const auto version = style::PaletteVersion();
-	const auto shapeValue = static_cast<uint32>(shape) & 3;
+	const auto shapeValue = static_cast<uint32>(shape) & 7;
 	const auto regenerate = (view.cached.size() != QSize(size, size))
 		|| (view.shape != shapeValue)
 		|| (cloud && !view.empty.null())
@@ -51,6 +51,8 @@ void ValidateUserpicCache(
 			Qt::SmoothTransformation);
 		if (shape == PeerUserpicShape::Monoforum) {
 			view.cached = Ui::ApplyMonoforumShape(std::move(view.cached));
+		} else if (shape == PeerUserpicShape::Square) {
+			// Keep the scaled image sharp-cornered.
 		} else if (shape == PeerUserpicShape::Forum) {
 			view.cached = Images::Round(
 				std::move(view.cached),
@@ -69,6 +71,8 @@ void ValidateUserpicCache(
 		auto p = QPainter(&view.cached);
 		if (shape == PeerUserpicShape::Monoforum) {
 			empty->paintMonoforum(p, 0, 0, size, size);
+		} else if (shape == PeerUserpicShape::Square) {
+			empty->paintSquare(p, 0, 0, size, size);
 		} else if (shape == PeerUserpicShape::Forum) {
 			empty->paintRounded(
 				p,
