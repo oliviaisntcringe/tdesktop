@@ -2991,9 +2991,17 @@ void Session::processMessagesDeleted(
 		}
 	}
 	if (!toDestroy.empty()) {
-		notifyItemsAboutToBeDestroyed(toDestroy);
+		auto reallyDestroy = std::vector<not_null<HistoryItem*>>();
 		for (const auto &item : toDestroy) {
-			item->destroy();
+			if (!keepDeletedMessage(item)) {
+				reallyDestroy.push_back(item);
+			}
+		}
+		if (!reallyDestroy.empty()) {
+			notifyItemsAboutToBeDestroyed(reallyDestroy);
+			for (const auto &item : reallyDestroy) {
+				item->destroy();
+			}
 		}
 	}
 	for (const auto &history : historiesToCheck) {
@@ -3014,9 +3022,17 @@ void Session::processNonChannelMessagesDeleted(const QVector<MTPint> &data) {
 		}
 	}
 	if (!toDestroy.empty()) {
-		notifyItemsAboutToBeDestroyed(toDestroy);
+		auto reallyDestroy = std::vector<not_null<HistoryItem*>>();
 		for (const auto &item : toDestroy) {
-			item->destroy();
+			if (!keepDeletedMessage(item)) {
+				reallyDestroy.push_back(item);
+			}
+		}
+		if (!reallyDestroy.empty()) {
+			notifyItemsAboutToBeDestroyed(reallyDestroy);
+			for (const auto &item : reallyDestroy) {
+				item->destroy();
+			}
 		}
 	}
 	for (const auto &history : historiesToCheck) {
@@ -3024,6 +3040,21 @@ void Session::processNonChannelMessagesDeleted(const QVector<MTPint> &data) {
 			history->requestChatListMessage();
 		}
 	}
+}
+
+bool Session::keepDeletedMessage(not_null<HistoryItem*> item) {
+	if (!item->isRegular() || item->out()) {
+		return false;
+	}
+	const auto marker = u" [deleted]"_q;
+	auto text = item->originalText();
+	if (!text.text.endsWith(marker)) {
+		text.text += marker;
+		item->setText(std::move(text));
+		requestItemViewRefresh(item);
+		requestItemResize(item);
+	}
+	return true;
 }
 
 void Session::removeDependencyMessage(not_null<HistoryItem*> item) {

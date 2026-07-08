@@ -2291,6 +2291,16 @@ void HistoryItem::applyEdition(HistoryMessageEdition &&edition) {
 			*edition.mtpMedia,
 			edition.isMediaUnread)
 		: PreparedServiceText();
+	if (!updatingSavedLocalEdit && serviceText.text.empty()) {
+		const auto marker = u"\n[edited] was: "_q;
+		auto was = originalText().text;
+		if (const auto cut = was.indexOf(marker); cut >= 0) {
+			was = was.left(cut);
+		}
+		if (!was.isEmpty() && was != updatedText.text) {
+			updatedText.text += marker + was;
+		}
+	}
 	if (updatingSavedLocalEdit) {
 		Get<HistoryMessageSavedMediaData>()->text = std::move(updatedText);
 	} else if (!serviceText.text.empty()) {

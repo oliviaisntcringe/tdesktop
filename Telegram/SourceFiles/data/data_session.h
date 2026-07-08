@@ -593,6 +593,7 @@ public:
 	void processMessagesDeleted(
 		PeerId peerId,
 		const QVector<MTPint> &data);
+	bool keepDeletedMessage(not_null<HistoryItem*> item);
 
 	void removeReactionsFromParticipant(
 		not_null<PeerData*> peer,
