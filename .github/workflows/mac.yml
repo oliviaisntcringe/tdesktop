@@ -50,6 +50,9 @@ jobs:
       UPLOAD_ARTIFACT: "true"
       ONLY_CACHE: "false"
       PREPARE_PATH: "Telegram/build/prepare/prepare.py"
+      CCACHE_DIR: "/Users/runner/.ccache"
+      CCACHE_MAXSIZE: "3G"
+      CCACHE_COMPILERCHECK: "content"
 
     steps:
       - name: Get repository name.
@@ -67,7 +70,7 @@ jobs:
 
           brew update
           brew upgrade || true
-          brew install automake libtool meson nasm ninja pkg-config
+          brew install automake libtool meson nasm ninja pkg-config ccache
 
           # Disable spotlight.
           sudo mdutil -a -i off
@@ -93,10 +96,18 @@ jobs:
       - name: Free up some disk space.
         run: find Libraries '(' '(' ! '(' -name '*.a' -o -name '*.h' -o -name '*.hpp' -o -name '*.inc' -o -name '*.cmake' -o -path '*/include/*' -o -path '*/objects-*' -o -path '*/cache_keys/*' -o -path '*/patches/*' -o -perm +111 ')' -type f ')' -o -empty ')' -delete
 
+      - name: ccache cache.
+        uses: actions/cache@v6
+        with:
+          path: ${{ env.CCACHE_DIR }}
+          key: ${{ runner.OS }}-ccache-${{ github.sha }}
+          restore-keys: ${{ runner.OS }}-ccache-
+
       - name: Telegram Desktop build.
         if: env.ONLY_CACHE == 'false'
         run: |
           cd $REPO_NAME/Telegram
+          ccache --zero-stats || true
 
           DEFINE=""
           if [ -n "${{ matrix.defines }}" ]; then
@@ -111,12 +122,17 @@ jobs:
           -D CMAKE_CONFIGURATION_TYPES=Debug \
           -D CMAKE_COMPILE_WARNING_AS_ERROR=ON \
           -D CMAKE_XCODE_ATTRIBUTE_CODE_SIGNING_ALLOWED=NO \
+          -D DESKTOP_APP_MAC_ARCH=x86_64 \
+          -D CMAKE_C_COMPILER_LAUNCHER=ccache \
+          -D CMAKE_CXX_COMPILER_LAUNCHER=ccache \
           -D TDESKTOP_API_TEST=ON \
           -D DESKTOP_APP_DISABLE_AUTOUPDATE=OFF \
           -D DESKTOP_APP_DISABLE_CRASH_REPORTS=OFF \
           $DEFINE
 
           cmake --build ../out --config Debug --parallel
+
+          ccache --show-stats || true
 
       - name: Move artifact.
         if: env.UPLOAD_ARTIFACT == 'true'
