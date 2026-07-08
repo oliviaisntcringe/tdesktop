@@ -44,6 +44,8 @@ inline constexpr auto kAmberThemeDefaultAppliedKey
 
 inline constexpr auto kLoudAlertPeersKey = "loud-alert-peers"_cs;
 
+inline constexpr auto kTouchBarPeersKey = "touch-bar-peers"_cs;
+
 struct WindowPosition {
 	int32 moncrc = 0;
 	int maximized = 0;
@@ -1046,6 +1048,11 @@ public:
 	[[nodiscard]] bool loudAlertPeer(uint64 peerId);
 	void toggleLoudAlertPeer(uint64 peerId);
 
+	[[nodiscard]] bool touchBarPeer(uint64 peerId);
+	void toggleTouchBarPeer(uint64 peerId);
+	[[nodiscard]] std::vector<uint64> touchBarPeers();
+	[[nodiscard]] rpl::producer<> touchBarPeersChanges() const;
+
 	template <typename Type, typename Other = Type>
 	[[nodiscard]] Type readPref(
 			std::string_view key,
@@ -1079,6 +1086,8 @@ private:
 	};
 
 	SettingsProxy _proxy;
+
+	rpl::event_stream<> _touchBarPeersChanged;
 
 	rpl::variable<bool> _adaptiveForWide = true;
 	bool _moderateModeEnabled = false;

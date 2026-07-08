@@ -12,6 +12,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "base/timer.h"
 #include "base/unixtime.h"
 #include "core/application.h"
+#include "core/core_settings.h"
 #include "core/sandbox.h"
 #include "data/data_changes.h"
 #include "data/data_cloud_file.h"
@@ -619,20 +620,30 @@ NSRect PeerRectByIndex(int index) {
 	};
 
 	const auto updatePinnedChats = [=] {
-		_pins = ranges::views::zip(
-			_session->data().pinnedChatsOrder(nullptr),
-			ranges::views::ints(0, ranges::unreachable)
-		) | ranges::views::transform([=](const auto &pair) {
-			const auto index = pair.second;
-			auto peer = pair.first.history()->peer;
-			auto view = peer->createUserpicView();
-			return std::make_unique<Pin>(Pin{
-				.peer = std::move(peer),
-				.userpicView = std::move(view),
-				.index = index,
+		auto sourcePeers = std::vector<not_null<PeerData*>>();
+		for (const auto bareId : Core::App().settings().touchBarPeers()) {
+			if (const auto peer = _session->data().peerLoaded(PeerId(bareId))) {
+				sourcePeers.push_back(peer);
+			}
+		}
+		if (sourcePeers.empty()) {
+			for (const auto &key : _session->data().pinnedChatsOrder(nullptr)) {
+				if (const auto history = key.history()) {
+					sourcePeers.push_back(history->peer);
+				}
+			}
+		}
+		_pins.clear();
+		_pins.reserve(sourcePeers.size());
+		for (auto i = 0; i != int(sourcePeers.size()); ++i) {
+			const auto peer = sourcePeers[i];
+			_pins.push_back(std::make_unique<Pin>(Pin{
+				.peer = peer,
+				.userpicView = peer->createUserpicView(),
+				.index = i,
 				.lastseen = CalculateLastseenStatus(peer),
-			});
-		}) | ranges::to_vector;
+			}));
+		}
 		_selfUnpinned = ranges::none_of(peers, &PeerData::isSelf);
 		_repliesUnpinned = ranges::none_of(peers, &PeerData::isRepliesChat);
 
@@ -674,9 +685,10 @@ NSRect PeerRectByIndex(int index) {
 		updateUserpics();
 	};
 
-	rpl::single(rpl::empty) | rpl::then(
-		_session->data().pinnedDialogsOrderUpdated()
-	) | rpl::on_next(updatePinnedChats, _lifetime);
+	rpl::single(rpl::empty) | rpl::then(rpl::merge(
+		_session->data().pinnedDialogsOrderUpdated(),
+		Core::App().settings().touchBarPeersChanges()
+	)) | rpl::on_next(updatePinnedChats, _lifetime);
 
 	const auto ArchiveId = Data::Folder::kId;
 	rpl::single(

@@ -1281,6 +1281,44 @@ void Settings::toggleLoudAlertPeer(uint64 peerId) {
 	writePref<QString>(kLoudAlertPeersKey, parts.join(' '));
 }
 
+bool Settings::touchBarPeer(uint64 peerId) {
+	const auto list = readPref<QString>(kTouchBarPeersKey);
+	return list.split(' ', Qt::SkipEmptyParts).contains(
+		QString::number(peerId));
+}
+
+void Settings::toggleTouchBarPeer(uint64 peerId) {
+	auto parts = readPref<QString>(kTouchBarPeersKey).split(
+		' ',
+		Qt::SkipEmptyParts);
+	const auto id = QString::number(peerId);
+	if (parts.contains(id)) {
+		parts.removeAll(id);
+	} else {
+		parts.push_back(id);
+	}
+	writePref<QString>(kTouchBarPeersKey, parts.join(' '));
+	_touchBarPeersChanged.fire({});
+}
+
+std::vector<uint64> Settings::touchBarPeers() {
+	auto result = std::vector<uint64>();
+	const auto parts = readPref<QString>(kTouchBarPeersKey).split(
+		' ',
+		Qt::SkipEmptyParts);
+	result.reserve(parts.size());
+	for (const auto &part : parts) {
+		if (const auto id = part.toULongLong()) {
+			result.push_back(id);
+		}
+	}
+	return result;
+}
+
+rpl::producer<> Settings::touchBarPeersChanges() const {
+	return _touchBarPeersChanged.events();
+}
+
 QString Settings::getSoundPath(const QString &key) const {
 	auto it = _soundOverrides.find(key);
 	if (it != _soundOverrides.end()) {

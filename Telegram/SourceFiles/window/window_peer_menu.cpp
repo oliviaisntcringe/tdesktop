@@ -27,6 +27,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "base/random.h"
 #include "base/options.h"
 #include "base/unixtime.h"
+#include "base/platform/base_platform_info.h"
 #include "base/unique_qptr.h"
 #include "base/qt/qt_key_modifiers.h"
 #include "boxes/delete_messages_box.h"
@@ -327,6 +328,7 @@ private:
 	void addExportChat();
 	void addDumpDialog();
 	void addLoudAlert();
+	void addTouchBarToggle();
 	void addTranslate();
 	void addReport();
 	void addNewContact();
@@ -988,6 +990,20 @@ void Filler::addLoudAlert() {
 		Core::App().settings().toggleLoudAlertPeer(peer->id.value);
 		Core::App().saveSettingsDelayed();
 	}, &st::menuIconUnmute);
+}
+
+void Filler::addTouchBarToggle() {
+	if (!_peer || !Platform::IsMac()) {
+		return;
+	}
+	const auto peer = _peer;
+	const auto on = Core::App().settings().touchBarPeer(peer->id.value);
+	_addAction(on
+		? u"Touch Bar: shown"_q
+		: u"Touch Bar: hidden"_q, [=] {
+		Core::App().settings().toggleTouchBarPeer(peer->id.value);
+		Core::App().saveSettingsDelayed();
+	}, &st::menuIconPin);
 }
 
 void Filler::addTranslate() {
@@ -1801,6 +1817,7 @@ void Filler::fillContextMenuActions() {
 	}
 	addDumpDialog();
 	addLoudAlert();
+	addTouchBarToggle();
 	addClearHistory();
 	addDeleteChat();
 	addLeaveChat();
@@ -1825,6 +1842,7 @@ void Filler::fillHistoryActions() {
 	addExportChat();
 	addDumpDialog();
 	addLoudAlert();
+	addTouchBarToggle();
 	addTranslate();
 	addReport();
 	addClearHistory();
