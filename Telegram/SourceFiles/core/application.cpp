@@ -500,6 +500,9 @@ void Application::startSettingsAndBackground() {
 	Window::Theme::Background()->start();
 	checkSystemDarkMode();
 	applyAmberThemeDefault();
+	if (settings().hasCustomAccentColor()) {
+		Window::Theme::ApplyAccentColor(settings().accentColor());
+	}
 	Ui::SetScreenReaderModeDisabled(
 		settings().readPref<bool>(kScreenReaderModeDisabledKey));
 }

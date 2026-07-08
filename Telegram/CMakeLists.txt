@@ -1709,6 +1709,8 @@ PRIVATE
     settings/sections/settings_blocked_peers.h
     settings/sections/settings_business.cpp
     settings/sections/settings_business.h
+    settings/sections/settings_appearance.cpp
+    settings/sections/settings_appearance.h
     settings/sections/settings_dumps.cpp
     settings/sections/settings_dumps.h
     settings/sections/settings_calls.cpp

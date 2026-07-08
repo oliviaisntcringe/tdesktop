@@ -48,6 +48,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "settings/sections/settings_advanced.h"
 #include "settings/sections/settings_business.h"
 #include "settings/sections/settings_dumps.h"
+#include "settings/sections/settings_appearance.h"
 #include "settings/sections/settings_calls.h"
 #include "settings/sections/settings_chat.h"
 #include "settings/settings_codes.h"
@@ -440,6 +441,13 @@ void BuildSectionButtons(SectionBuilder &builder) {
 		.targetSection = DumpsId(),
 		.icon = { &st::menuIconExport },
 		.keywords = { u"dumps"_q, u"export"_q, u"csv"_q },
+	});
+
+	builder.addSectionButton({
+		.title = rpl::single(u"Appearance"_q),
+		.targetSection = AppearanceId(),
+		.icon = { &st::menuIconPalette },
+		.keywords = { u"accent"_q, u"color"_q, u"theme"_q },
 	});
 
 	builder.addSectionButton({

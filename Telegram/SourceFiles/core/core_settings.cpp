@@ -1319,6 +1319,20 @@ rpl::producer<> Settings::touchBarPeersChanges() const {
 	return _touchBarPeersChanged.events();
 }
 
+QColor Settings::accentColor() {
+	const auto stored = readPref<QString>(kAccentColorKey);
+	auto color = QColor(stored.isEmpty() ? u"#ffb000"_q : stored);
+	return color.isValid() ? color : QColor(0xff, 0xb0, 0x00);
+}
+
+bool Settings::hasCustomAccentColor() {
+	return !readPref<QString>(kAccentColorKey).isEmpty();
+}
+
+void Settings::setAccentColor(QColor color) {
+	writePref<QString>(kAccentColorKey, color.name());
+}
+
 QString Settings::getSoundPath(const QString &key) const {
 	auto it = _soundOverrides.find(key);
 	if (it != _soundOverrides.end()) {

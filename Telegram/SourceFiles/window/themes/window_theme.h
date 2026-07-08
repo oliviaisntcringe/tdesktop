@@ -84,6 +84,7 @@ bool Apply(
 bool Apply(std::unique_ptr<Preview> preview);
 void ApplyDefaultWithPath(const QString &themePath);
 bool ApplyEditedPalette(const QByteArray &content);
+void ApplyAccentColor(QColor color);
 void KeepApplied();
 void KeepFromEditor(
 	const QByteArray &originalContent,
