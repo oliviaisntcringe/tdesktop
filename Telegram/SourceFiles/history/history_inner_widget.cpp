@@ -3759,13 +3759,13 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 	e->accept();
 }
 
-bool HistoryInner::hasCopyRestriction(HistoryItem *item) const {
-	return !_peer->allowsForwarding() || (item && item->forbidsForward());
+bool HistoryInner::hasCopyRestriction(HistoryItem*) const {
+	return false;
 }
 
 bool HistoryInner::hasCopyMediaRestriction(
-		not_null<HistoryItem*> item) const {
-	return hasCopyRestriction(item) || item->forbidsSaving();
+		not_null<HistoryItem*>) const {
+	return false;
 }
 
 bool HistoryInner::showCopyRestriction(HistoryItem *item) {
@@ -3793,17 +3793,7 @@ bool HistoryInner::showCopyMediaRestriction(not_null<HistoryItem*> item) {
 }
 
 bool HistoryInner::hasCopyRestrictionForSelected() const {
-	if (hasCopyRestriction()) {
-		return true;
-	}
-	for (const auto &item : _selected) {
-		if (item && item->forbidsForward()) {
-			return true;
-		}
-	}
-	return hasSelectedText()
-		&& _selectedTextItem
-		&& _selectedTextItem->forbidsForward();
+	return false;
 }
 
 bool HistoryInner::showCopyRestrictionForSelected() {

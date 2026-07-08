@@ -1703,14 +1703,12 @@ bool ListWidget::isEmpty() const {
 		&& (_itemsHeight + _itemsRevealHeight == 0);
 }
 
-bool ListWidget::hasCopyRestriction(HistoryItem *item) const {
-	return _delegate->listCopyRestrictionType(item)
-		!= CopyRestrictionType::None;
+bool ListWidget::hasCopyRestriction(HistoryItem*) const {
+	return false;
 }
 
-bool ListWidget::hasCopyMediaRestriction(not_null<HistoryItem*> item) const {
-	return _delegate->listCopyMediaRestrictionType(item)
-		!= CopyRestrictionType::None;
+bool ListWidget::hasCopyMediaRestriction(not_null<HistoryItem*>) const {
+	return false;
 }
 
 bool ListWidget::showCopyRestriction(HistoryItem *item) {
@@ -1740,21 +1738,6 @@ bool ListWidget::showCopyMediaRestriction(not_null<HistoryItem*> item) {
 }
 
 bool ListWidget::hasCopyRestrictionForSelected() const {
-	if (hasCopyRestriction()) {
-		return true;
-	}
-	if (_selected.empty()) {
-		if (_selectedTextItem && _selectedTextItem->forbidsForward()) {
-			return true;
-		}
-	}
-	for (const auto &[itemId, selection] : _selected) {
-		if (const auto item = session().data().message(itemId)) {
-			if (item->forbidsForward()) {
-				return true;
-			}
-		}
-	}
 	return false;
 }
 
