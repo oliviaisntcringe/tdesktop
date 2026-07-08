@@ -120,8 +120,8 @@ WrapWidget::WrapWidget(
 	window->windowId().type == Window::SeparateType::SharedMedia)
 , _wrap(wrap)
 , _controller(createController(window, memento->content()))
-, _topShadow(this)
-, _bottomShadow(this) {
+, _topShadow(this, st::windowSubTextFg)
+, _bottomShadow(this, st::windowSubTextFg) {
 	_topShadow->toggleOn(
 		topShadowToggledValue(
 		) | rpl::filter([](bool shown) {

@@ -268,7 +268,7 @@ MainWidget::MainWidget(
 	: nullptr)
 , _history(std::in_place, this, _controller)
 , _sideShadow(_dialogs
-	? base::make_unique_q<Ui::PlainShadow>(this)
+	? base::make_unique_q<Ui::PlainShadow>(this, st::windowSubTextFg)
 	: nullptr)
 , _playerPlaylist(this, _controller)
 , _changelogs(Core::Changelogs::Create(&controller->session())) {
@@ -1924,7 +1924,7 @@ void MainWidget::showNewSection(
 			updateControlsGeometry();
 		}, _thirdSection->lifetime());
 		if (!_thirdShadow) {
-			_thirdShadow.create(this);
+			_thirdShadow.create(this, st::windowSubTextFg);
 			_thirdShadow->show();
 			orderWidgets();
 		}

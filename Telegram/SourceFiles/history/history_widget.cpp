@@ -365,7 +365,7 @@ HistoryWidget::HistoryWidget(
 	[=](not_null<const HistoryView::Element*> view) {
 		return _list && _list->itemTop(view) >= 0;
 	}))
-, _topShadow(this) {
+, _topShadow(this, st::windowSubTextFg) {
 	setAcceptDrops(true);
 
 	session().downloaderTaskFinished() | rpl::on_next([=] {
