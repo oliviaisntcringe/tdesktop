@@ -55,6 +55,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "history/history_widget.h"
 #include "history/history_drag_area.h"
 #include "history/history_item_helpers.h" // GetErrorForSending.
+#include "history/history_item.h"
 #include "history/view/media/history_view_media.h"
 #include "history/view/history_view_chat_section.h"
 #include "history/view/history_view_service_message.h"
@@ -100,8 +101,11 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 #include <QtCore/QCoreApplication>
 #include <QtCore/QMimeData>
+#include <QtWidgets/QApplication>
 
 namespace {
+
+constexpr auto kLoudAlertThrottle = crl::time(3000);
 
 void ClearBotStartToken(PeerData *peer) {
 	if (peer && peer->isUser() && peer->asUser()->isBot()) {
@@ -298,6 +302,12 @@ MainWidget::MainWidget(
 			u"t.gram :: amber"_q);
 	}, _statusBar->lifetime());
 	_statusBar->show();
+
+	session().changes().messageUpdates(
+		Data::MessageUpdate::Flag::NewAdded
+	) | rpl::on_next([=](const Data::MessageUpdate &update) {
+		maybeLoudAlert(update.item);
+	}, lifetime());
 
 	_history->cancelRequests(
 	) | rpl::on_next([=] {
@@ -2381,6 +2391,28 @@ int MainWidget::getMainSectionTop() const {
 
 int MainWidget::getThirdSectionTop() const {
 	return 0;
+}
+
+void MainWidget::maybeLoudAlert(not_null<HistoryItem*> item) {
+	if (item->out() || !item->isRegular()) {
+		return;
+	}
+	const auto peer = item->history()->peer;
+	if (!Core::App().settings().loudAlertPeer(peer->id.value)) {
+		return;
+	}
+	const auto now = crl::now();
+	if (_lastLoudAlert && (now - _lastLoudAlert < kLoudAlertThrottle)) {
+		return;
+	}
+	_lastLoudAlert = now;
+	if (const auto handle = window()) {
+		QApplication::alert(handle, 0);
+	}
+	const auto preview = item->notificationText().text;
+	_controller->show(Ui::MakeInformBox(rpl::single(u"NEW POST in "_q
+		+ peer->name()
+		+ (preview.isEmpty() ? QString() : (u"\n\n"_q + preview)))));
 }
 
 void MainWidget::hideAll() {

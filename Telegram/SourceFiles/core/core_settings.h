@@ -42,6 +42,8 @@ inline constexpr auto kScreenReaderModeDisabledKey
 inline constexpr auto kAmberThemeDefaultAppliedKey
 	= "amber-theme-default-applied"_cs;
 
+inline constexpr auto kLoudAlertPeersKey = "loud-alert-peers"_cs;
+
 struct WindowPosition {
 	int32 moncrc = 0;
 	int maximized = 0;
@@ -1040,6 +1042,9 @@ public:
 		writePrefImpl<Type>(key, std::forward<Other>(value));
 	}
 	void clearPref(std::string_view key);
+
+	[[nodiscard]] bool loudAlertPeer(uint64 peerId);
+	void toggleLoudAlertPeer(uint64 peerId);
 
 	template <typename Type, typename Other = Type>
 	[[nodiscard]] Type readPref(

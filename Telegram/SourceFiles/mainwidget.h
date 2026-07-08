@@ -241,6 +241,7 @@ private:
 	void handleAudioUpdate(const Media::Player::TrackState &state);
 	void updateMediaPlaylistPosition(int x);
 	void updateControlsGeometry();
+	void maybeLoudAlert(not_null<HistoryItem*> item);
 	void showBootSequence();
 	void bootTick();
 	void updateMainSectionShown();
@@ -355,6 +356,7 @@ private:
 	object_ptr<Ui::RpWidget> _bootOverlay = { nullptr };
 	QStringList _bootLines;
 	int _bootShown = 0;
+	crl::time _lastLoudAlert = 0;
 	object_ptr<Ui::PlainShadow> _thirdShadow = { nullptr };
 	object_ptr<Ui::ResizeArea> _firstColumnResizeArea = { nullptr };
 	object_ptr<Ui::ResizeArea> _thirdColumnResizeArea = { nullptr };

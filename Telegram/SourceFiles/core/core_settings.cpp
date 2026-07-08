@@ -1249,6 +1249,38 @@ void Settings::writePrefImpl<bool>(std::string_view key, bool value) {
 	writePrefGeneric(key, value ? "\x1"_q : QByteArray());
 }
 
+template <>
+std::optional<QString> Settings::readPrefImpl<QString>(std::string_view key) {
+	if (const auto data = readPrefGeneric(key)) {
+		return QString::fromUtf8(*data);
+	}
+	return {};
+}
+
+template <>
+void Settings::writePrefImpl<QString>(std::string_view key, QString value) {
+	writePrefGeneric(key, value.toUtf8());
+}
+
+bool Settings::loudAlertPeer(uint64 peerId) {
+	const auto list = readPref<QString>(kLoudAlertPeersKey);
+	return list.split(' ', Qt::SkipEmptyParts).contains(
+		QString::number(peerId));
+}
+
+void Settings::toggleLoudAlertPeer(uint64 peerId) {
+	auto parts = readPref<QString>(kLoudAlertPeersKey).split(
+		' ',
+		Qt::SkipEmptyParts);
+	const auto id = QString::number(peerId);
+	if (parts.contains(id)) {
+		parts.removeAll(id);
+	} else {
+		parts.push_back(id);
+	}
+	writePref<QString>(kLoudAlertPeersKey, parts.join(' '));
+}
+
 QString Settings::getSoundPath(const QString &key) const {
 	auto it = _soundOverrides.find(key);
 	if (it != _soundOverrides.end()) {

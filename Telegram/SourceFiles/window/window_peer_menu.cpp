@@ -326,6 +326,7 @@ private:
 	void addToggleTopicClosed();
 	void addExportChat();
 	void addDumpDialog();
+	void addLoudAlert();
 	void addTranslate();
 	void addReport();
 	void addNewContact();
@@ -973,6 +974,20 @@ void Filler::addDumpDialog() {
 	_addAction(u"Dump dialog"_q, [=] {
 		Dumps::Create(peer);
 	}, &st::menuIconExport);
+}
+
+void Filler::addLoudAlert() {
+	if (!_peer) {
+		return;
+	}
+	const auto peer = _peer;
+	const auto on = Core::App().settings().loudAlertPeer(peer->id.value);
+	_addAction(on
+		? u"Loud alert: ON"_q
+		: u"Loud alert: OFF"_q, [=] {
+		Core::App().settings().toggleLoudAlertPeer(peer->id.value);
+		Core::App().saveSettingsDelayed();
+	}, &st::menuIconUnmute);
 }
 
 void Filler::addTranslate() {
@@ -1785,6 +1800,7 @@ void Filler::fillContextMenuActions() {
 		}
 	}
 	addDumpDialog();
+	addLoudAlert();
 	addClearHistory();
 	addDeleteChat();
 	addLeaveChat();
@@ -1808,6 +1824,7 @@ void Filler::fillHistoryActions() {
 	addDirectMessages();
 	addExportChat();
 	addDumpDialog();
+	addLoudAlert();
 	addTranslate();
 	addReport();
 	addClearHistory();
