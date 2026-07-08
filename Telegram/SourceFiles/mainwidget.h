@@ -244,6 +244,8 @@ private:
 	void maybeLoudAlert(not_null<HistoryItem*> item);
 	void showBootSequence();
 	void bootTick();
+	void setupWorkspaces();
+	void showScriptsWorkspace(bool show);
 	void updateMainSectionShown();
 	void updateDialogsWidthAnimated();
 	void updateThirdColumnToCurrentChat(
@@ -356,6 +358,7 @@ private:
 	object_ptr<Ui::RpWidget> _bootOverlay = { nullptr };
 	QStringList _bootLines;
 	int _bootShown = 0;
+	object_ptr<Ui::RpWidget> _scriptsOverlay = { nullptr };
 	crl::time _lastLoudAlert = 0;
 	object_ptr<Ui::PlainShadow> _thirdShadow = { nullptr };
 	object_ptr<Ui::ResizeArea> _firstColumnResizeArea = { nullptr };

@@ -295,7 +295,7 @@ MainWidget::MainWidget(
 		p.drawText(
 			inner,
 			Qt::AlignVCenter | Qt::AlignLeft,
-			u"F1 help    F2 chats    F9 dump    F10 quit"_q);
+			u"F1 chats    F2 scripts    F3 --    F10 quit"_q);
 		p.drawText(
 			inner,
 			Qt::AlignVCenter | Qt::AlignRight,
@@ -308,6 +308,8 @@ MainWidget::MainWidget(
 	) | rpl::on_next([=](const Data::MessageUpdate &update) {
 		maybeLoudAlert(update.item);
 	}, lifetime());
+
+	setupWorkspaces();
 
 	_history->cancelRequests(
 	) | rpl::on_next([=] {
@@ -492,6 +494,67 @@ MainWidget::~MainWidget() {
 	if (_controller->activeChatCurrent()) {
 		session().api().saveCurrentDraftToCloud();
 	}
+}
+
+void MainWidget::setupWorkspaces() {
+	Shortcuts::Requests(
+	) | rpl::filter([=] {
+		return window()->isActiveWindow();
+	}) | rpl::on_next([=](not_null<Shortcuts::Request*> request) {
+		using Command = Shortcuts::Command;
+		request->check(Command::Workspace1, 1) && request->handle([=] {
+			showScriptsWorkspace(false);
+			return true;
+		});
+		request->check(Command::Workspace2, 1) && request->handle([=] {
+			showScriptsWorkspace(true);
+			return true;
+		});
+	}, lifetime());
+}
+
+void MainWidget::showScriptsWorkspace(bool show) {
+	if (!show) {
+		_scriptsOverlay.destroy();
+		return;
+	} else if (_scriptsOverlay) {
+		return;
+	}
+	_scriptsOverlay.create(this);
+	const auto overlay = _scriptsOverlay.data();
+	overlay->setGeometry(rect());
+	overlay->raise();
+	overlay->show();
+
+	sizeValue() | rpl::on_next([=](QSize size) {
+		overlay->setGeometry(QRect(QPoint(), size));
+	}, overlay->lifetime());
+
+	overlay->paintRequest() | rpl::on_next([=](QRect) {
+		auto p = QPainter(overlay);
+		p.fillRect(overlay->rect(), st::windowBg);
+		const auto font = st::windowFrameStatusFont;
+		p.setFont(font);
+		p.setPen(st::windowSubTextFg->c);
+		const auto step = font->height * 3 / 2;
+		auto y = step + font->ascent;
+		const auto lines = QStringList{
+			u"tuerlegram :: SCRIPTS WORKSPACE"_q,
+			QString(),
+			u"  F1  chats"_q,
+			u"  F2  scripts  (you are here)"_q,
+			u"  F3  --"_q,
+			QString(),
+			u"no scripts yet -- workspace shell."_q,
+			u"press F1 to return to chats."_q,
+		};
+		for (const auto &line : lines) {
+			if (!line.isEmpty()) {
+				p.drawText(step, y, line);
+			}
+			y += step;
+		}
+	}, overlay->lifetime());
 }
 
 void MainWidget::showBootSequence() {

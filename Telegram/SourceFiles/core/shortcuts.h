@@ -89,6 +89,9 @@ enum class Command {
 	SupportScrollToCurrent,
 	SupportHistoryBack,
 	SupportHistoryForward,
+
+	Workspace1,
+	Workspace2,
 };
 
 [[maybe_unused]] constexpr auto kShowFolder = {
