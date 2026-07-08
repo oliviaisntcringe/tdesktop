@@ -17,6 +17,9 @@ windowDefaultHeight: 600px;
 windowBigDefaultWidth: 1024px;
 windowBigDefaultHeight: 768px;
 
+windowFrameStatusHeight: 18px;
+windowFrameStatusFont: font(12px semibold);
+
 columnMinimalWidthLeft: 260px;
 columnMaximalWidthLeft: 540px;
 columnMinimalWidthMain: 380px;

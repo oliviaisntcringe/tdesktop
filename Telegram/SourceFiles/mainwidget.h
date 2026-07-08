@@ -349,6 +349,7 @@ private:
 	std::unique_ptr<Window::ConnectionState> _connecting;
 
 	const base::unique_qptr<Ui::PlainShadow> _sideShadow;
+	object_ptr<Ui::RpWidget> _statusBar;
 	object_ptr<Ui::PlainShadow> _thirdShadow = { nullptr };
 	object_ptr<Ui::ResizeArea> _firstColumnResizeArea = { nullptr };
 	object_ptr<Ui::ResizeArea> _thirdColumnResizeArea = { nullptr };

@@ -270,11 +270,33 @@ MainWidget::MainWidget(
 , _sideShadow(_dialogs
 	? base::make_unique_q<Ui::PlainShadow>(this, st::windowSubTextFg)
 	: nullptr)
+, _statusBar(this)
 , _playerPlaylist(this, _controller)
 , _changelogs(Core::Changelogs::Create(&controller->session())) {
 	if (_dialogs) {
 		setupConnectingWidget();
 	}
+
+	_statusBar->paintRequest() | rpl::on_next([=](QRect) {
+		auto p = QPainter(_statusBar.get());
+		const auto full = _statusBar->width();
+		const auto tall = _statusBar->height();
+		p.fillRect(0, 0, full, tall, st::windowBg);
+		p.fillRect(0, 0, full, st::lineWidth, st::windowSubTextFg);
+		p.setFont(st::windowFrameStatusFont);
+		p.setPen(st::windowSubTextFg->c);
+		const auto pad = st::windowFrameStatusFont->height;
+		const auto inner = QRect(pad, 0, full - 2 * pad, tall);
+		p.drawText(
+			inner,
+			Qt::AlignVCenter | Qt::AlignLeft,
+			u"F1 help    F2 chats    F9 dump    F10 quit"_q);
+		p.drawText(
+			inner,
+			Qt::AlignVCenter | Qt::AlignRight,
+			u"t.gram :: amber"_q);
+	}, _statusBar->lifetime());
+	_statusBar->show();
 
 	_history->cancelRequests(
 	) | rpl::on_next([=] {
@@ -2445,6 +2467,8 @@ void MainWidget::updateControlsGeometry() {
 		_thirdShadow.destroy();
 	}
 	const auto mainSectionTop = getMainSectionTop();
+	const auto statusHeight = st::windowFrameStatusHeight;
+	const auto bodyHeight = height() - statusHeight;
 	auto dialogsWidth = _dialogs
 		? qRound(_a_dialogsWidth.value(_dialogsWidth))
 		: isOneColumn()
@@ -2467,7 +2491,7 @@ void MainWidget::updateControlsGeometry() {
 			0,
 			mainSectionTop,
 			dialogsWidth,
-			height() - mainSectionTop);
+			bodyHeight - mainSectionTop);
 		if (_dialogs) {
 			_dialogs->setGeometryWithTopMoved(
 				mainSectionGeometry,
@@ -2476,7 +2500,7 @@ void MainWidget::updateControlsGeometry() {
 		_history->setGeometryWithTopMoved(
 			mainSectionGeometry,
 			_contentScrollAddToY);
-		if (_hider) _hider->setGeometry(0, 0, dialogsWidth, height());
+		if (_hider) _hider->setGeometry(0, 0, dialogsWidth, bodyHeight);
 	} else {
 		auto thirdSectionWidth = _thirdSection ? _thirdColumnWidth : 0;
 		if (_thirdSection) {
@@ -2485,15 +2509,15 @@ void MainWidget::updateControlsGeometry() {
 				width() - thirdSectionWidth,
 				thirdSectionTop,
 				thirdSectionWidth,
-				height() - thirdSectionTop);
+				bodyHeight - thirdSectionTop);
 		}
 		const auto shadowTop = _controller->window().verticalShadowTop();
-		const auto shadowHeight = height() - shadowTop;
+		const auto shadowHeight = bodyHeight - shadowTop;
 		if (_dialogs) {
 			accumulate_min(
 				dialogsWidth,
 				width() - st::columnMinimalWidthMain);
-			_dialogs->setGeometryToLeft(0, 0, dialogsWidth, height());
+			_dialogs->setGeometryToLeft(0, 0, dialogsWidth, bodyHeight);
 		}
 		if (_sideShadow) {
 			_sideShadow->setGeometryToLeft(
@@ -2530,14 +2554,14 @@ void MainWidget::updateControlsGeometry() {
 			dialogsWidth,
 			mainSectionTop,
 			mainSectionWidth,
-			height() - mainSectionTop
+			bodyHeight - mainSectionTop
 		), _contentScrollAddToY);
 		if (_hider) {
 			_hider->setGeometryToLeft(
 				dialogsWidth,
 				0,
 				mainSectionWidth,
-				height());
+				bodyHeight);
 		}
 	}
 	if (_mainSection) {
@@ -2545,11 +2569,13 @@ void MainWidget::updateControlsGeometry() {
 			_history->x(),
 			mainSectionTop,
 			_history->width(),
-			height() - mainSectionTop);
+			bodyHeight - mainSectionTop);
 		_mainSection->setGeometryWithTopMoved(
 			mainSectionGeometry,
 			_contentScrollAddToY);
 	}
+	_statusBar->setGeometry(0, bodyHeight, width(), statusHeight);
+	_statusBar->raise();
 	refreshResizeAreas();
 	if (_player) {
 		_player->entity()->updateDropdownsGeometry();
