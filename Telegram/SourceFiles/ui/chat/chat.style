@@ -505,8 +505,8 @@ HistoryFileLayout {
 	thumbSkip: pixels;
 }
 
-msgFileThumbRadiusSmall: 4px;
-msgFileThumbRadiusLarge: 12px;
+msgFileThumbRadiusSmall: 2px;
+msgFileThumbRadiusLarge: 2px;
 msgFileLayout: HistoryFileLayout {
 	padding: margins(12px, 8px, 10px, 8px);
 	nameTop: 12px;
