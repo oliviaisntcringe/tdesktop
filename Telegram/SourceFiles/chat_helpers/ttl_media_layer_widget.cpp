@@ -10,6 +10,12 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "base/event_filter.h"
 #include "data/data_document.h"
 #include "data/data_session.h"
+#include "data/data_file_click_handler.h"
+#include "data/data_media_types.h"
+#include "data/data_photo.h"
+#include "data/data_photo_media.h"
+#include "core/application.h"
+#include "core/file_utilities.h"
 #include "editor/editor_layer_widget.h"
 #include "history/history.h"
 #include "history/history_item.h"
@@ -212,6 +218,52 @@ PreviewWrap::PreviewWrap(
 					- close->height()
 					- st::ttlMediaButtonBottomSkip));
 		}, close->lifetime());
+	}
+
+	{
+		const auto media = _item->media();
+		const auto document = media ? media->document() : nullptr;
+		const auto photo = media ? media->photo() : nullptr;
+		if (document || photo) {
+			const auto itemId = _item->fullId();
+			const auto session = &_item->history()->session();
+			const auto save = Ui::CreateChild<Ui::RoundButton>(
+				this,
+				rpl::single(u"Save"_q),
+				st::ttlMediaButton);
+			save->setFullRadius(true);
+			save->setClickedCallback([=] {
+				if (document) {
+					DocumentSaveClickHandler::SaveAndTrack(
+						itemId,
+						document,
+						DocumentSaveClickHandler::Mode::ToNewFile);
+				} else if (photo) {
+					const auto view = photo->activeMediaView();
+					if (!view || !view->loaded()) {
+						return;
+					}
+					FileDialog::GetWritePath(
+						Core::App().getFileDialogParent(),
+						tr::lng_save_photo(tr::now),
+						u"JPEG Image (*.jpg)"_q,
+						filedialogDefaultName(u"photo"_q, u".jpg"_q),
+						crl::guard(session, [=](const QString &result) {
+							if (!result.isEmpty()) {
+								view->saveToFile(result);
+							}
+						}));
+				}
+			});
+			rpl::combine(
+				sizeValue(),
+				_elementInner.value()
+			) | rpl::on_next([=](QSize size, QRect inner) {
+				save->moveToLeft(
+					inner.x() + (inner.width() - save->width()) / 2,
+					st::ttlMediaButtonBottomSkip);
+			}, save->lifetime());
+		}
 	}
 
 	QWidget::setAttribute(Qt::WA_OpaquePaintEvent, false);

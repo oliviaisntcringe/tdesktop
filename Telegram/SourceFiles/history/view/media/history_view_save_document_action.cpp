@@ -119,7 +119,7 @@ void AddSaveDocumentAction(
 		HistoryItem *item,
 		not_null<DocumentData*> document,
 		not_null<ListWidget*> list) {
-	if (!item || list->hasCopyMediaRestriction(item) || ItemHasTtl(item)) {
+	if (!item || list->hasCopyMediaRestriction(item)) {
 		return;
 	}
 	AddSaveDocumentAction(
