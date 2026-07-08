@@ -1,45 +1,34 @@
-# [Telegram Desktop][telegram_desktop] – Official Messenger
+# tuerlegram
 
-This is the complete source code and the build instructions for the official [Telegram][telegram] messenger desktop client, based on the [Telegram API][telegram_api] and the [MTProto][telegram_proto] secure protocol.
+**tuerlegram** is a custom [Telegram Desktop][telegram_desktop] fork with an amber-CRT terminal look and a set of power-user / privacy features. It is built on the [Telegram API][telegram_api] and the [MTProto][telegram_proto] secure protocol.
 
-[![Version](https://badge.fury.io/gh/telegramdesktop%2Ftdesktop.svg)](https://github.com/telegramdesktop/tdesktop/releases)
-[![Build Status](https://github.com/telegramdesktop/tdesktop/workflows/Windows./badge.svg)](https://github.com/telegramdesktop/tdesktop/actions)
-[![Build Status](https://github.com/telegramdesktop/tdesktop/workflows/MacOS./badge.svg)](https://github.com/telegramdesktop/tdesktop/actions)
-[![Build Status](https://github.com/telegramdesktop/tdesktop/workflows/Linux./badge.svg)](https://github.com/telegramdesktop/tdesktop/actions)
-[![Built with Depot](https://img.shields.io/badge/Built%20with-Depot.dev-46A75A)](https://depot.dev)
-
-[![Preview of Telegram Desktop][preview_image]][preview_image_url]
+[![Build Status](https://github.com/oliviaisntcringe/tdesktop/workflows/MacOS./badge.svg)](https://github.com/oliviaisntcringe/tdesktop/actions)
+[![Build Status](https://github.com/oliviaisntcringe/tdesktop/workflows/Linux./badge.svg)](https://github.com/oliviaisntcringe/tdesktop/actions)
 
 The source code is published under GPLv3 with OpenSSL exception, the license is available [here][license].
 
-## Supported systems
+## What's different from upstream
 
-The latest version is available for
+tuerlegram keeps everything Telegram Desktop does and adds:
 
-* [Windows 7 and above (64 bit)](https://telegram.org/dl/desktop/win64) ([portable](https://telegram.org/dl/desktop/win64_portable))
-* [Windows 7 and above (32 bit)](https://telegram.org/dl/desktop/win) ([portable](https://telegram.org/dl/desktop/win_portable))
-* [macOS 10.13 and above](https://telegram.org/dl/desktop/mac)
-* [Linux static build for 64 bit](https://telegram.org/dl/desktop/linux)
-* [Snap](https://snapcraft.io/telegram-desktop)
-* [Flatpak](https://flathub.org/apps/details/org.telegram.desktop)
+* **Amber CRT reskin** — a warm amber-on-black terminal theme applied by default, a global monospace font, square avatars, sharp message bubbles, amber panel divider frames, and an F-key status bar at the bottom of the window.
+* **Terminal boot sequence** — a short fake boot log on startup.
+* **Dumps** — a Settings section that exports whole chats to CSV and keeps a managed library of past dumps; also a "Dump dialog" chat context-menu action.
+* **Loud alert** — a per-chat toggle that fires an impossible-to-miss alert (window flash + modal box) on every new post in a flagged channel.
+* **Save one-time media** — save view-once / self-destruct photos and videos.
+* **Custom Touch Bar chats** (macOS) — choose exactly which chats appear on the Touch Bar instead of the fixed pinned list.
 
-## Old system versions
+This is a personal fork for the author's own use. It is not affiliated with or endorsed by Telegram.
 
-Version **4.9.9** was the last that supports older systems
+## Build instructions
 
-* [macOS 10.12](https://updates.tdesktop.com/tmac/tsetup.4.9.9.dmg)
-* [Linux with glibc < 2.28 static build](https://updates.tdesktop.com/tlinux/tsetup.4.9.9.tar.xz)
+Building matches upstream Telegram Desktop:
 
-Version **2.4.4** was the last that supports older systems
+* [Windows (32-bit and 64-bit)][win]
+* [macOS][mac]
+* [GNU/Linux using Docker][linux]
 
-* [OS X 10.10 and 10.11](https://updates.tdesktop.com/tosx/tsetup-osx.2.4.4.dmg)
-* [Linux static build for 32 bit](https://updates.tdesktop.com/tlinux32/tsetup32.2.4.4.tar.xz)
-
-Version **1.8.15** was the last that supports older systems
-
-* [Windows XP and Vista](https://updates.tdesktop.com/tsetup/tsetup.1.8.15.exe) ([portable](https://updates.tdesktop.com/tsetup/tportable.1.8.15.zip))
-* [OS X 10.8 and 10.9](https://updates.tdesktop.com/tmac/tsetup.1.8.15.dmg)
-* [OS X 10.6 and 10.7](https://updates.tdesktop.com/tmac32/tsetup32.1.8.15.dmg)
+You will need your own `api_id` / `api_hash` — see [docs/api_credentials.md](docs/api_credentials.md).
 
 ## Third-party
 
@@ -67,14 +56,9 @@ Version **1.8.15** was the last that supports older systems
 * Hunspell ([LGPL](https://github.com/hunspell/hunspell/blob/master/COPYING.LESSER))
 * Ada ([Apache License 2.0](https://github.com/ada-url/ada/blob/main/LICENSE-APACHE))
 
-## Build instructions
-
-* [Windows (32-bit and 64-bit)][win]
-* [macOS][mac]
-* [GNU/Linux using Docker][linux]
+Based on [Telegram Desktop][telegram_desktop] by Telegram FZ-LLC.
 
 [//]: # (LINKS)
-[telegram]: https://telegram.org
 [telegram_desktop]: https://desktop.telegram.org
 [telegram_api]: https://core.telegram.org
 [telegram_proto]: https://core.telegram.org/mtproto
@@ -82,18 +66,3 @@ Version **1.8.15** was the last that supports older systems
 [win]: docs/building-win.md
 [mac]: docs/building-mac.md
 [linux]: docs/building-linux.md
-[preview_image]: https://github.com/telegramdesktop/tdesktop/blob/dev/docs/assets/preview.png "Preview of Telegram Desktop"
-[preview_image_url]: https://raw.githubusercontent.com/telegramdesktop/tdesktop/dev/docs/assets/preview.png
-
-## Thanks to
-
-<a href="https://depot.dev">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://depot.dev/assets/brand/1693758816/depot-logo-horizontal-on-dark.svg">
-    <source media="(prefers-color-scheme: light)" srcset="https://depot.dev/assets/brand/1693758816/depot-logo-horizontal-on-light.svg">
-    <img alt="Depot" src="https://depot.dev/assets/brand/1693758816/depot-logo-horizontal-on-light.svg" width="150">
-  </picture>
-</a>
-
-CI infrastructure sponsored by [Depot](https://depot.dev) — fast GitHub Actions runners.
-
