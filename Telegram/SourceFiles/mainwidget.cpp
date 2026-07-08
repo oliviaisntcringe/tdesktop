@@ -72,6 +72,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "media/player/media_player_instance.h"
 #include "base/qthelp_regex.h"
 #include "base/options.h"
+#include "base/call_delayed.h"
 #include "mtproto/mtproto_dc_options.h"
 #include "core/update_checker.h"
 #include "core/shortcuts.h"
@@ -469,12 +470,82 @@ MainWidget::MainWidget(
 				.sessionWindow = weak,
 			}));
 	});
+
+	static auto bootShown = false;
+	if (!bootShown) {
+		bootShown = true;
+		showBootSequence();
+	}
 }
 
 MainWidget::~MainWidget() {
 	if (_controller->activeChatCurrent()) {
 		session().api().saveCurrentDraftToCloud();
 	}
+}
+
+void MainWidget::showBootSequence() {
+	_bootLines = QStringList{
+		u"t.gram bios v6.9.4  --  amber crt"_q,
+		QString(),
+		u"LOADING KERNEL................ OK"_q,
+		u"MOUNTING /chats............... OK"_q,
+		u"INIT MTPROTO CRYPTO........... OK"_q,
+		u"CONNECTING TO TELEGRAM........ OK"_q,
+		u"SYNCING DIALOGS............... OK"_q,
+		u"DECRYPTING SESSION............ OK"_q,
+		u"STARTING UI................... OK"_q,
+		QString(),
+		u"READY."_q,
+	};
+	_bootShown = 0;
+	_bootOverlay.create(this);
+	const auto boot = _bootOverlay.data();
+	boot->setGeometry(rect());
+	boot->raise();
+	boot->show();
+
+	sizeValue() | rpl::on_next([=](QSize size) {
+		boot->setGeometry(QRect(QPoint(), size));
+	}, boot->lifetime());
+
+	boot->paintRequest() | rpl::on_next([=](QRect) {
+		auto p = QPainter(boot);
+		p.fillRect(boot->rect(), st::windowBg);
+		const auto font = st::windowFrameStatusFont;
+		p.setFont(font);
+		p.setPen(st::windowSubTextFg->c);
+		const auto step = font->height * 3 / 2;
+		const auto left = step;
+		auto y = step + font->ascent;
+		const auto total = int(_bootLines.size());
+		const auto count = (_bootShown < total) ? _bootShown : total;
+		for (auto i = 0; i != count; ++i) {
+			if (!_bootLines[i].isEmpty()) {
+				p.drawText(left, y, _bootLines[i]);
+			}
+			y += step;
+		}
+	}, boot->lifetime());
+
+	bootTick();
+}
+
+void MainWidget::bootTick() {
+	if (!_bootOverlay) {
+		return;
+	}
+	++_bootShown;
+	_bootOverlay->update();
+	if (_bootShown > int(_bootLines.size())) {
+		base::call_delayed(320, _bootOverlay.data(), [=] {
+			_bootOverlay.destroy();
+		});
+		return;
+	}
+	base::call_delayed(110, _bootOverlay.data(), [=] {
+		bootTick();
+	});
 }
 
 Main::Session &MainWidget::session() const {

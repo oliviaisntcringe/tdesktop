@@ -241,6 +241,8 @@ private:
 	void handleAudioUpdate(const Media::Player::TrackState &state);
 	void updateMediaPlaylistPosition(int x);
 	void updateControlsGeometry();
+	void showBootSequence();
+	void bootTick();
 	void updateMainSectionShown();
 	void updateDialogsWidthAnimated();
 	void updateThirdColumnToCurrentChat(
@@ -350,6 +352,9 @@ private:
 
 	const base::unique_qptr<Ui::PlainShadow> _sideShadow;
 	object_ptr<Ui::RpWidget> _statusBar;
+	object_ptr<Ui::RpWidget> _bootOverlay = { nullptr };
+	QStringList _bootLines;
+	int _bootShown = 0;
 	object_ptr<Ui::PlainShadow> _thirdShadow = { nullptr };
 	object_ptr<Ui::ResizeArea> _firstColumnResizeArea = { nullptr };
 	object_ptr<Ui::ResizeArea> _thirdColumnResizeArea = { nullptr };
