@@ -50,6 +50,8 @@ inline constexpr auto kTouchBarPeersKey = "touch-bar-peers"_cs;
 
 inline constexpr auto kAccentColorKey = "accent-color"_cs;
 
+inline constexpr auto kScriptedPeersKey = "scripted-peers"_cs;
+
 struct WindowPosition {
 	int32 moncrc = 0;
 	int maximized = 0;
@@ -1060,6 +1062,10 @@ public:
 	[[nodiscard]] QColor accentColor();
 	[[nodiscard]] bool hasCustomAccentColor();
 	void setAccentColor(QColor color);
+
+	[[nodiscard]] bool scriptedPeer(uint64 peerId);
+	void toggleScriptedPeer(uint64 peerId);
+	[[nodiscard]] std::vector<uint64> scriptedPeers();
 
 	template <typename Type, typename Other = Type>
 	[[nodiscard]] Type readPref(

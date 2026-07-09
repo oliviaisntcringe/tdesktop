@@ -22,6 +22,13 @@ public:
 
 	[[nodiscard]] QString eval(const QString &code);
 
+	// Runs `script` with `message` and `state` JS objects in scope
+	// (both given as JSON), returns the updated `state` as a JSON string.
+	[[nodiscard]] QString run(
+		const QString &script,
+		const QString &messageJson,
+		const QString &stateJson);
+
 private:
 	JSRuntime *_runtime = nullptr;
 	JSContext *_context = nullptr;

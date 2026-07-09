@@ -87,6 +87,10 @@ class HistoryHider;
 struct SeparateId;
 } // namespace Window
 
+namespace Scripting {
+class Manager;
+} // namespace Scripting
+
 namespace Calls {
 class Call;
 class GroupCall;
@@ -352,6 +356,7 @@ private:
 	object_ptr<Window::SectionWidget> _thirdSection = { nullptr };
 	std::shared_ptr<Window::SectionMemento> _thirdSectionFromStack;
 	std::unique_ptr<Window::ConnectionState> _connecting;
+	std::unique_ptr<Scripting::Manager> _scripts;
 
 	const base::unique_qptr<Ui::PlainShadow> _sideShadow;
 	object_ptr<Ui::RpWidget> _statusBar;

@@ -59,4 +59,19 @@ QString Engine::eval(const QString &code) {
 	return text;
 }
 
+QString Engine::run(
+		const QString &script,
+		const QString &messageJson,
+		const QString &stateJson) {
+	const auto message = messageJson.isEmpty() ? u"null"_q : messageJson;
+	const auto state = stateJson.isEmpty() ? u"{}"_q : stateJson;
+	const auto wrapper = u"(function(){\n"_q
+		+ u"var message = "_q + message + u";\n"_q
+		+ u"var state = ("_q + state + u");\n"_q
+		+ script + u"\n"_q
+		+ u"return JSON.stringify(state);\n"_q
+		+ u"})()"_q;
+	return eval(wrapper);
+}
+
 } // namespace Scripting

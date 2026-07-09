@@ -1329,6 +1329,39 @@ bool Settings::hasCustomAccentColor() {
 	return !readPref<QString>(kAccentColorKey).isEmpty();
 }
 
+bool Settings::scriptedPeer(uint64 peerId) {
+	const auto list = readPref<QString>(kScriptedPeersKey);
+	return list.split(' ', Qt::SkipEmptyParts).contains(
+		QString::number(peerId));
+}
+
+void Settings::toggleScriptedPeer(uint64 peerId) {
+	auto parts = readPref<QString>(kScriptedPeersKey).split(
+		' ',
+		Qt::SkipEmptyParts);
+	const auto id = QString::number(peerId);
+	if (parts.contains(id)) {
+		parts.removeAll(id);
+	} else {
+		parts.push_back(id);
+	}
+	writePref<QString>(kScriptedPeersKey, parts.join(' '));
+}
+
+std::vector<uint64> Settings::scriptedPeers() {
+	auto result = std::vector<uint64>();
+	const auto parts = readPref<QString>(kScriptedPeersKey).split(
+		' ',
+		Qt::SkipEmptyParts);
+	result.reserve(parts.size());
+	for (const auto &part : parts) {
+		if (const auto id = part.toULongLong()) {
+			result.push_back(id);
+		}
+	}
+	return result;
+}
+
 void Settings::setAccentColor(QColor color) {
 	writePref<QString>(kAccentColorKey, color.name());
 }

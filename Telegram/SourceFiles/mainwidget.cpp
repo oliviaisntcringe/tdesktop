@@ -56,6 +56,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "history/history_drag_area.h"
 #include "history/history_item_helpers.h" // GetErrorForSending.
 #include "history/history_item.h"
+#include "scripting/scripting_manager.h"
 #include "history/view/media/history_view_media.h"
 #include "history/view/history_view_chat_section.h"
 #include "history/view/history_view_service_message.h"
@@ -497,6 +498,8 @@ MainWidget::~MainWidget() {
 }
 
 void MainWidget::setupWorkspaces() {
+	_scripts = std::make_unique<Scripting::Manager>(&session());
+
 	Shortcuts::Requests(
 	) | rpl::filter([=] {
 		return window()->isActiveWindow();
@@ -538,23 +541,40 @@ void MainWidget::showScriptsWorkspace(bool show) {
 		p.setPen(st::windowSubTextFg->c);
 		const auto step = font->height * 3 / 2;
 		auto y = step + font->ascent;
-		const auto lines = QStringList{
-			u"tuerlegram :: SCRIPTS WORKSPACE"_q,
-			QString(),
-			u"  F1  chats"_q,
-			u"  F2  scripts  (you are here)"_q,
-			u"  F3  --"_q,
-			QString(),
-			u"no scripts yet -- workspace shell."_q,
-			u"press F1 to return to chats."_q,
-		};
-		for (const auto &line : lines) {
+		const auto draw = [&](const QString &line) {
 			if (!line.isEmpty()) {
 				p.drawText(step, y, line);
 			}
 			y += step;
+		};
+		draw(u"tuerlegram :: SCRIPTS WORKSPACE"_q);
+		draw(QString());
+		draw(u"Attached scripts (message counter):"_q);
+		draw(QString());
+		const auto peers = Core::App().settings().scriptedPeers();
+		if (peers.empty()) {
+			draw(u"  none. right-click a chat -> Run script here."_q);
+		} else {
+			for (const auto bareId : peers) {
+				const auto peer = session().data().peerLoaded(PeerId(bareId));
+				const auto name = peer
+					? peer->name()
+					: QString::number(bareId);
+				const auto state = _scripts
+					? _scripts->state(bareId)
+					: QString();
+				draw(u"  "_q + name + u"   "_q + state);
+			}
 		}
+		draw(QString());
+		draw(u"press F1 to return to chats."_q);
 	}, overlay->lifetime());
+
+	if (_scripts) {
+		_scripts->updates() | rpl::on_next([=] {
+			overlay->update();
+		}, overlay->lifetime());
+	}
 }
 
 void MainWidget::showBootSequence() {

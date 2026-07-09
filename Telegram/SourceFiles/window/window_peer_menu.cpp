@@ -329,6 +329,7 @@ private:
 	void addDumpDialog();
 	void addLoudAlert();
 	void addTouchBarToggle();
+	void addScriptToggle();
 	void addTranslate();
 	void addReport();
 	void addNewContact();
@@ -1004,6 +1005,20 @@ void Filler::addTouchBarToggle() {
 		Core::App().settings().toggleTouchBarPeer(peer->id.value);
 		Core::App().saveSettingsDelayed();
 	}, &st::menuIconPin);
+}
+
+void Filler::addScriptToggle() {
+	if (!_peer) {
+		return;
+	}
+	const auto peer = _peer;
+	const auto on = Core::App().settings().scriptedPeer(peer->id.value);
+	_addAction(on
+		? u"Script: running here"_q
+		: u"Run script here"_q, [=] {
+		Core::App().settings().toggleScriptedPeer(peer->id.value);
+		Core::App().saveSettingsDelayed();
+	}, &st::menuIconManage);
 }
 
 void Filler::addTranslate() {
@@ -1818,6 +1833,7 @@ void Filler::fillContextMenuActions() {
 	addDumpDialog();
 	addLoudAlert();
 	addTouchBarToggle();
+	addScriptToggle();
 	addClearHistory();
 	addDeleteChat();
 	addLeaveChat();
@@ -1843,6 +1859,7 @@ void Filler::fillHistoryActions() {
 	addDumpDialog();
 	addLoudAlert();
 	addTouchBarToggle();
+	addScriptToggle();
 	addTranslate();
 	addReport();
 	addClearHistory();
