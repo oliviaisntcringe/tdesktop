@@ -250,6 +250,8 @@ private:
 	void bootTick();
 	void setupWorkspaces();
 	void showScriptsWorkspace(bool show);
+	void setupScriptPanel();
+	[[nodiscard]] uint64 activeScriptedPeerId() const;
 	void updateMainSectionShown();
 	void updateDialogsWidthAnimated();
 	void updateThirdColumnToCurrentChat(
@@ -364,6 +366,7 @@ private:
 	QStringList _bootLines;
 	int _bootShown = 0;
 	object_ptr<Ui::RpWidget> _scriptsOverlay = { nullptr };
+	object_ptr<Ui::RpWidget> _scriptPanel = { nullptr };
 	crl::time _lastLoudAlert = 0;
 	object_ptr<Ui::PlainShadow> _thirdShadow = { nullptr };
 	object_ptr<Ui::ResizeArea> _firstColumnResizeArea = { nullptr };

@@ -499,6 +499,7 @@ MainWidget::~MainWidget() {
 
 void MainWidget::setupWorkspaces() {
 	_scripts = std::make_unique<Scripting::Manager>(&session());
+	setupScriptPanel();
 
 	Shortcuts::Requests(
 	) | rpl::filter([=] {
@@ -574,6 +575,64 @@ void MainWidget::showScriptsWorkspace(bool show) {
 		_scripts->updates() | rpl::on_next([=] {
 			overlay->update();
 		}, overlay->lifetime());
+	}
+}
+
+uint64 MainWidget::activeScriptedPeerId() const {
+	const auto key = _controller->activeChatCurrent();
+	const auto history = key.history();
+	if (!history) {
+		return 0;
+	}
+	const auto bareId = history->peer->id.value;
+	return Core::App().settings().scriptedPeer(bareId) ? bareId : 0;
+}
+
+void MainWidget::setupScriptPanel() {
+	_scriptPanel.create(this);
+	const auto panel = _scriptPanel.data();
+	panel->hide();
+
+	panel->paintRequest() | rpl::on_next([=](QRect) {
+		auto p = QPainter(panel);
+		p.fillRect(panel->rect(), st::windowBg);
+		p.fillRect(0, 0, st::lineWidth, panel->height(), st::windowSubTextFg);
+		const auto font = st::windowFrameStatusFont;
+		p.setFont(font);
+		p.setPen(st::windowSubTextFg->c);
+		const auto step = font->height * 3 / 2;
+		auto y = step + font->ascent;
+		const auto draw = [&](const QString &line) {
+			if (!line.isEmpty()) {
+				p.drawText(step, y, line);
+			}
+			y += step;
+		};
+		const auto bareId = activeScriptedPeerId();
+		draw(u"[ script panel ]"_q);
+		draw(QString());
+		if (!bareId) {
+			draw(u"no script attached here."_q);
+		} else {
+			const auto peer = session().data().peerLoaded(PeerId(bareId));
+			draw(peer ? peer->name() : QString::number(bareId));
+			draw(QString());
+			const auto state = _scripts ? _scripts->state(bareId) : QString();
+			draw(u"state:"_q);
+			draw(state.isEmpty() ? u"{}"_q : state);
+		}
+	}, panel->lifetime());
+
+	_controller->activeChatValue(
+	) | rpl::on_next([=](const Dialogs::Key&) {
+		updateControlsGeometry();
+		panel->update();
+	}, panel->lifetime());
+
+	if (_scripts) {
+		_scripts->updates() | rpl::on_next([=] {
+			panel->update();
+		}, panel->lifetime());
 	}
 }
 
@@ -2687,6 +2746,9 @@ void MainWidget::updateControlsGeometry() {
 			mainSectionGeometry,
 			_contentScrollAddToY);
 		if (_hider) _hider->setGeometry(0, 0, dialogsWidth, bodyHeight);
+		if (_scriptPanel) {
+			_scriptPanel->hide();
+		}
 	} else {
 		auto thirdSectionWidth = _thirdSection ? _thirdColumnWidth : 0;
 		if (_thirdSection) {
@@ -2719,9 +2781,14 @@ void MainWidget::updateControlsGeometry() {
 				st::lineWidth,
 				shadowHeight);
 		}
+		const auto scriptedId = activeScriptedPeerId();
+		const auto scriptPanelWidth = scriptedId
+			? st::columnMinimalWidthThird
+			: 0;
 		const auto mainSectionWidth = width()
 			- dialogsWidth
-			- thirdSectionWidth;
+			- thirdSectionWidth
+			- scriptPanelWidth;
 		if (_callTopBar) {
 			_callTopBar->resizeToWidth(mainSectionWidth);
 			_callTopBar->moveToLeft(dialogsWidth, 0);
@@ -2742,6 +2809,19 @@ void MainWidget::updateControlsGeometry() {
 			mainSectionWidth,
 			bodyHeight - mainSectionTop
 		), _contentScrollAddToY);
+		if (_scriptPanel) {
+			if (scriptPanelWidth > 0) {
+				_scriptPanel->setGeometry(
+					dialogsWidth + mainSectionWidth,
+					mainSectionTop,
+					scriptPanelWidth,
+					bodyHeight - mainSectionTop);
+				_scriptPanel->show();
+				_scriptPanel->raise();
+			} else {
+				_scriptPanel->hide();
+			}
+		}
 		if (_hider) {
 			_hider->setGeometryToLeft(
 				dialogsWidth,
