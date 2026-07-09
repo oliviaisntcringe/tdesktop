@@ -1,4 +1,5 @@
 # tuerlegram
+<img width="1536" height="1024" alt="image" src="https://github.com/user-attachments/assets/6163e69a-578f-4b9d-918a-0859e8f4b5f3" />
 
 **tuerlegram** is a custom [Telegram Desktop][telegram_desktop] fork with an amber-CRT terminal look and a set of power-user / privacy features. It is built on the [Telegram API][telegram_api] and the [MTProto][telegram_proto] secure protocol.
 
