@@ -1063,9 +1063,10 @@ public:
 	[[nodiscard]] bool hasCustomAccentColor();
 	void setAccentColor(QColor color);
 
-	[[nodiscard]] bool scriptedPeer(uint64 peerId);
-	void toggleScriptedPeer(uint64 peerId);
+	[[nodiscard]] QString chatScript(uint64 peerId);
+	void setChatScript(uint64 peerId, const QString &name);
 	[[nodiscard]] std::vector<uint64> scriptedPeers();
+	[[nodiscard]] rpl::producer<> chatScriptsChanges() const;
 
 	template <typename Type, typename Other = Type>
 	[[nodiscard]] Type readPref(
@@ -1102,6 +1103,7 @@ private:
 	SettingsProxy _proxy;
 
 	rpl::event_stream<> _touchBarPeersChanged;
+	rpl::event_stream<> _chatScriptsChanged;
 
 	rpl::variable<bool> _adaptiveForWide = true;
 	bool _moderateModeEnabled = false;

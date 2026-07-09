@@ -1329,23 +1329,36 @@ bool Settings::hasCustomAccentColor() {
 	return !readPref<QString>(kAccentColorKey).isEmpty();
 }
 
-bool Settings::scriptedPeer(uint64 peerId) {
-	const auto list = readPref<QString>(kScriptedPeersKey);
-	return list.split(' ', Qt::SkipEmptyParts).contains(
-		QString::number(peerId));
+QString Settings::chatScript(uint64 peerId) {
+	const auto prefix = QString::number(peerId) + u"="_q;
+	const auto parts = readPref<QString>(kScriptedPeersKey).split(
+		' ',
+		Qt::SkipEmptyParts);
+	for (const auto &part : parts) {
+		if (part.startsWith(prefix)) {
+			return part.mid(prefix.size());
+		}
+	}
+	return QString();
 }
 
-void Settings::toggleScriptedPeer(uint64 peerId) {
+void Settings::setChatScript(uint64 peerId, const QString &name) {
+	const auto prefix = QString::number(peerId) + u"="_q;
 	auto parts = readPref<QString>(kScriptedPeersKey).split(
 		' ',
 		Qt::SkipEmptyParts);
-	const auto id = QString::number(peerId);
-	if (parts.contains(id)) {
-		parts.removeAll(id);
-	} else {
-		parts.push_back(id);
+	for (auto i = parts.begin(); i != parts.end();) {
+		if (i->startsWith(prefix)) {
+			i = parts.erase(i);
+		} else {
+			++i;
+		}
+	}
+	if (!name.isEmpty()) {
+		parts.push_back(prefix + name);
 	}
 	writePref<QString>(kScriptedPeersKey, parts.join(' '));
+	_chatScriptsChanged.fire({});
 }
 
 std::vector<uint64> Settings::scriptedPeers() {
@@ -1353,13 +1366,19 @@ std::vector<uint64> Settings::scriptedPeers() {
 	const auto parts = readPref<QString>(kScriptedPeersKey).split(
 		' ',
 		Qt::SkipEmptyParts);
-	result.reserve(parts.size());
 	for (const auto &part : parts) {
-		if (const auto id = part.toULongLong()) {
-			result.push_back(id);
+		const auto eq = part.indexOf('=');
+		if (eq > 0) {
+			if (const auto id = part.left(eq).toULongLong()) {
+				result.push_back(id);
+			}
 		}
 	}
 	return result;
+}
+
+rpl::producer<> Settings::chatScriptsChanges() const {
+	return _chatScriptsChanged.events();
 }
 
 void Settings::setAccentColor(QColor color) {

@@ -23,28 +23,24 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include <QtCore/QJsonObject>
 
 namespace Scripting {
-namespace {
 
-// Built-in script for the counter proof (Phase 2). User scripts come later.
-constexpr auto kCounterScript = R"(
-state.count = (state.count || 0) + 1;
-if (message) {
-	state.last = message.text;
+std::vector<QString> LibraryScripts() {
+	auto result = std::vector<QString>();
+	const auto dir = QDir(cWorkingDir() + u"scripts/lib"_q);
+	const auto files = dir.entryList(
+		QStringList{ u"*.js"_q },
+		QDir::Files,
+		QDir::Name);
+	result.reserve(files.size());
+	for (const auto &file : files) {
+		auto name = file;
+		if (name.endsWith(u".js"_q)) {
+			name.chop(3);
+		}
+		result.push_back(name);
+	}
+	return result;
 }
-)";
-
-[[nodiscard]] QString MessageJson(not_null<HistoryItem*> item) {
-	auto object = QJsonObject();
-	object.insert(u"text"_q, item->originalText().text);
-	object.insert(u"author"_q, item->from()->name());
-	object.insert(u"out"_q, item->out());
-	object.insert(u"id"_q, double(item->id.bare));
-	object.insert(u"date"_q, double(item->date()));
-	return QString::fromUtf8(
-		QJsonDocument(object).toJson(QJsonDocument::Compact));
-}
-
-} // namespace
 
 Manager::Manager(not_null<Main::Session*> session)
 : _session(session) {
@@ -61,15 +57,63 @@ void Manager::process(not_null<HistoryItem*> item) {
 	}
 	const auto peer = item->history()->peer;
 	const auto bareId = peer->id.value;
-	if (!Core::App().settings().scriptedPeer(bareId)) {
+	if (Core::App().settings().chatScript(bareId).isEmpty()) {
 		return;
 	}
-	const auto updated = _engine.run(
-		script(bareId),
-		MessageJson(item),
-		readState(bareId));
-	writeState(bareId, updated);
+	auto message = QJsonObject();
+	message.insert(u"text"_q, item->originalText().text);
+	message.insert(u"author"_q, item->from()->name());
+	message.insert(u"out"_q, item->out());
+	message.insert(u"id"_q, double(item->id.bare));
+	message.insert(u"date"_q, double(item->date()));
+	auto event = QJsonObject();
+	event.insert(u"type"_q, u"message"_q);
+	event.insert(u"message"_q, message);
+	runEvent(bareId, QString::fromUtf8(
+		QJsonDocument(event).toJson(QJsonDocument::Compact)));
+}
+
+QString Manager::runEvent(uint64 peerId, const QString &eventJson) {
+	const auto name = Core::App().settings().chatScript(peerId);
+	if (name.isEmpty()) {
+		return readState(peerId);
+	}
+	const auto code = scriptCode(name);
+	if (code.isEmpty()) {
+		return readState(peerId);
+	}
+	const auto updated = _engine.run(code, eventJson, readState(peerId));
+	writeState(peerId, updated);
 	_updates.fire({});
+	return updated;
+}
+
+QString Manager::libraryPath(const QString &name) const {
+	return cWorkingDir() + u"scripts/lib/"_q + name + u".js"_q;
+}
+
+std::vector<QString> Manager::libraryList() const {
+	return LibraryScripts();
+}
+
+QString Manager::scriptCode(const QString &name) const {
+	auto file = QFile(libraryPath(name));
+	if (!file.open(QIODevice::ReadOnly)) {
+		return QString();
+	}
+	return QString::fromUtf8(file.readAll());
+}
+
+void Manager::saveScript(const QString &name, const QString &code) {
+	QDir().mkpath(cWorkingDir() + u"scripts/lib"_q);
+	auto file = QFile(libraryPath(name));
+	if (file.open(QIODevice::WriteOnly)) {
+		file.write(code.toUtf8());
+	}
+}
+
+void Manager::deleteScript(const QString &name) {
+	QFile::remove(libraryPath(name));
 }
 
 QString Manager::statePath(uint64 peerId) const {
@@ -101,43 +145,6 @@ QString Manager::state(uint64 peerId) {
 
 rpl::producer<> Manager::updates() const {
 	return _updates.events();
-}
-
-QString Manager::scriptPath(uint64 peerId) const {
-	return cWorkingDir()
-		+ u"scripts/script_"_q
-		+ QString::number(peerId)
-		+ u".js"_q;
-}
-
-QString Manager::loadScript(uint64 peerId) const {
-	auto file = QFile(scriptPath(peerId));
-	if (file.open(QIODevice::ReadOnly)) {
-		const auto text = QString::fromUtf8(file.readAll());
-		if (!text.trimmed().isEmpty()) {
-			return text;
-		}
-	}
-	return QString::fromUtf8(kCounterScript);
-}
-
-QString Manager::script(uint64 peerId) {
-	const auto i = _scriptCache.find(peerId);
-	if (i != end(_scriptCache)) {
-		return i->second;
-	}
-	auto loaded = loadScript(peerId);
-	_scriptCache.emplace(peerId, loaded);
-	return loaded;
-}
-
-void Manager::setScript(uint64 peerId, const QString &text) {
-	_scriptCache[peerId] = text;
-	QDir().mkpath(cWorkingDir() + u"scripts"_q);
-	auto file = QFile(scriptPath(peerId));
-	if (file.open(QIODevice::WriteOnly)) {
-		file.write(text.toUtf8());
-	}
 }
 
 } // namespace Scripting

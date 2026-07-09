@@ -8,7 +8,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #pragma once
 
 #include "scripting/scripting_engine.h"
-#include "base/flat_map.h"
 
 class HistoryItem;
 
@@ -18,6 +17,9 @@ class Session;
 
 namespace Scripting {
 
+// Names of scripts in the library (files under scripts/lib/), filesystem-read.
+[[nodiscard]] std::vector<QString> LibraryScripts();
+
 class Manager final {
 public:
 	explicit Manager(not_null<Main::Session*> session);
@@ -25,24 +27,27 @@ public:
 	// Current persisted state (JSON) for a peer's attached script.
 	[[nodiscard]] QString state(uint64 peerId);
 
-	// The user-editable JS script for a given chat (per-chat).
-	[[nodiscard]] QString script(uint64 peerId);
-	void setScript(uint64 peerId, const QString &text);
+	// Named script library (files under scripts/lib/).
+	[[nodiscard]] std::vector<QString> libraryList() const;
+	[[nodiscard]] QString scriptCode(const QString &name) const;
+	void saveScript(const QString &name, const QString &code);
+	void deleteScript(const QString &name);
 
-	// Fires whenever any attached script's state changes.
+	// Runs a chat's bound script for an event JSON; persists + returns state.
+	QString runEvent(uint64 peerId, const QString &eventJson);
+
+	// Fires whenever any chat's state changes.
 	[[nodiscard]] rpl::producer<> updates() const;
 
 private:
 	void process(not_null<HistoryItem*> item);
-	[[nodiscard]] QString loadScript(uint64 peerId) const;
-	[[nodiscard]] QString scriptPath(uint64 peerId) const;
+	[[nodiscard]] QString libraryPath(const QString &name) const;
 	[[nodiscard]] QString statePath(uint64 peerId) const;
 	[[nodiscard]] QString readState(uint64 peerId) const;
 	void writeState(uint64 peerId, const QString &json);
 
 	const not_null<Main::Session*> _session;
 	Engine _engine;
-	base::flat_map<uint64, QString> _scriptCache;
 	rpl::event_stream<> _updates;
 	rpl::lifetime _lifetime;
 

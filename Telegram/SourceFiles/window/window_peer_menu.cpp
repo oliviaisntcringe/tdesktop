@@ -118,6 +118,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/data_peer_values.h"
 #include "dialogs/dialogs_key.h"
 #include "core/application.h"
+#include "core/core_settings.h"
+#include "scripting/scripting_manager.h"
 #include "core/file_utilities.h"
 #include "core/ui_integration.h"
 #include "export/export_manager.h"
@@ -1011,14 +1013,35 @@ void Filler::addScriptToggle() {
 	if (!_peer) {
 		return;
 	}
-	const auto peer = _peer;
-	const auto on = Core::App().settings().scriptedPeer(peer->id.value);
-	_addAction(on
-		? u"Script: running here"_q
-		: u"Run script here"_q, [=] {
-		Core::App().settings().toggleScriptedPeer(peer->id.value);
-		Core::App().saveSettingsDelayed();
-	}, &st::menuIconManage);
+	const auto peerId = _peer->id.value;
+	const auto scripts = Scripting::LibraryScripts();
+	if (scripts.empty()) {
+		return;
+	}
+	const auto current = Core::App().settings().chatScript(peerId);
+	const auto label = current.isEmpty()
+		? u"Script: none"_q
+		: (u"Script: "_q + current);
+	_addAction(PeerMenuCallback::Args{
+		.text = label,
+		.handler = nullptr,
+		.icon = &st::menuIconManage,
+		.fillSubmenu = [=](not_null<Ui::PopupMenu*> menu) {
+			const auto pick = [=](QString name) {
+				Core::App().settings().setChatScript(peerId, name);
+				Core::App().saveSettingsDelayed();
+			};
+			menu->addAction(current.isEmpty()
+				? u"• None"_q
+				: u"None"_q, [=] { pick(QString()); });
+			for (const auto &name : scripts) {
+				const auto text = (name == current)
+					? (u"• "_q + name)
+					: name;
+				menu->addAction(text, [=] { pick(name); });
+			}
+		},
+	});
 }
 
 void Filler::addTranslate() {

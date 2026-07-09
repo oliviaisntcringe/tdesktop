@@ -538,39 +538,127 @@ void MainWidget::showScriptsWorkspace(bool show) {
 	const auto font = st::windowFrameStatusFont;
 	const auto pad = font->height * 2;
 	const auto headerHeight = font->height * 4;
+	const auto listWidth = st::columnMinimalWidthThird;
+	const auto gap = font->height / 2;
 
-	const auto history = _controller->activeChatCurrent().history();
-	const auto bareId = history ? history->peer->id.value : uint64(0);
-	const auto chatName = history ? history->peer->name() : u"(open a chat)"_q;
+	const auto nameField = Ui::CreateChild<Ui::InputField>(
+		overlay,
+		st::defaultInputField,
+		Ui::InputField::Mode::SingleLine,
+		rpl::single(u"script name"_q),
+		QString());
+	nameField->show();
 
 	const auto editor = Ui::CreateChild<Ui::InputField>(
 		overlay,
 		st::defaultInputField,
 		Ui::InputField::Mode::MultiLine,
-		rpl::single(u"// JS with `message` and `state` in scope"_q),
-		(_scripts && bareId) ? _scripts->script(bareId) : QString());
+		rpl::single(u"// JavaScript — `event`, `message`, `state` in scope"_q),
+		QString());
 	editor->show();
 
 	const auto save = Ui::CreateChild<Ui::RoundButton>(
 		overlay,
-		rpl::single(u"Save & apply"_q),
+		rpl::single(u"Save"_q),
 		st::defaultActiveButton);
 	save->show();
+	const auto newBtn = Ui::CreateChild<Ui::RoundButton>(
+		overlay,
+		rpl::single(u"New"_q),
+		st::defaultLightButton);
+	newBtn->show();
+	const auto deleteBtn = Ui::CreateChild<Ui::RoundButton>(
+		overlay,
+		rpl::single(u"Delete"_q),
+		st::defaultLightButton);
+	deleteBtn->show();
+
+	const auto scripts = _scripts
+		? _scripts->libraryList()
+		: std::vector<QString>();
+	const auto listButtons
+		= std::make_shared<std::vector<Ui::RoundButton*>>();
+	for (const auto &name : scripts) {
+		const auto button = Ui::CreateChild<Ui::RoundButton>(
+			overlay,
+			rpl::single(name),
+			st::defaultLightButton);
+		button->show();
+		button->setClickedCallback([=] {
+			nameField->setText(name);
+			editor->setText(_scripts ? _scripts->scriptCode(name) : QString());
+		});
+		listButtons->push_back(button);
+	}
+
+	// Deferred: the click callback runs on a button owned by the overlay,
+	// so we must not destroy the overlay synchronously from within it.
+	const auto reopen = [=] {
+		crl::on_main(this, [=] {
+			showScriptsWorkspace(false);
+			showScriptsWorkspace(true);
+		});
+	};
 	save->setClickedCallback([=] {
-		if (_scripts && bareId) {
-			_scripts->setScript(bareId, editor->getLastText());
+		// Name doubles as a filename and a space-separated binding token,
+		// so keep it to safe characters.
+		auto name = nameField->getLastText().trimmed();
+		name.replace(QChar(' '), QChar('_'));
+		name.remove(QChar('='));
+		name.remove(QChar('/'));
+		name.remove(QChar('\\'));
+		if (name.isEmpty() || !_scripts) {
+			return;
 		}
+		_scripts->saveScript(name, editor->getLastText());
+		reopen();
+	});
+	deleteBtn->setClickedCallback([=] {
+		const auto name = nameField->getLastText().trimmed();
+		if (name.isEmpty() || !_scripts) {
+			return;
+		}
+		_scripts->deleteScript(name);
+		reopen();
+	});
+	newBtn->setClickedCallback([=] {
+		nameField->setText(QString());
+		editor->setText(QString());
+		nameField->setFocus();
 	});
 
 	sizeValue() | rpl::on_next([=](QSize size) {
 		overlay->setGeometry(QRect(QPoint(), size));
-		const auto width = std::max(size.width() - 2 * pad, 0);
-		save->resizeToWidth(width);
+
+		auto y = headerHeight;
+		const auto listButtonWidth = std::max(listWidth - pad - gap, 0);
+		for (const auto button : *listButtons) {
+			button->resizeToWidth(listButtonWidth);
+			button->moveToLeft(pad, y);
+			y += button->height() + gap;
+		}
+
+		const auto editorLeft = pad + listWidth;
+		const auto editorWidth = std::max(
+			size.width() - editorLeft - pad,
+			0);
+		nameField->resize(editorWidth, nameField->height());
+		nameField->moveToLeft(editorLeft, headerHeight);
+
 		const auto buttonTop = size.height() - pad - save->height();
-		save->moveToLeft(pad, buttonTop);
-		const auto top = headerHeight;
-		const auto height = std::max(buttonTop - pad - top, font->height);
-		editor->setGeometry(pad, top, width, height);
+		const auto third = std::max((editorWidth - 2 * gap) / 3, 0);
+		save->resizeToWidth(third);
+		newBtn->resizeToWidth(third);
+		deleteBtn->resizeToWidth(third);
+		save->moveToLeft(editorLeft, buttonTop);
+		newBtn->moveToLeft(editorLeft + third + gap, buttonTop);
+		deleteBtn->moveToLeft(editorLeft + 2 * (third + gap), buttonTop);
+
+		const auto editorTop = headerHeight + nameField->height() + gap;
+		const auto editorHeight = std::max(
+			buttonTop - pad - editorTop,
+			int(font->height));
+		editor->setGeometry(editorLeft, editorTop, editorWidth, editorHeight);
 	}, overlay->lifetime());
 
 	overlay->paintRequest() | rpl::on_next([=](QRect) {
@@ -581,7 +669,11 @@ void MainWidget::showScriptsWorkspace(bool show) {
 		p.drawText(
 			pad,
 			font->height + font->ascent,
-			u"SCRIPT for "_q + chatName + u"   (F1 = chats)"_q);
+			u"SCRIPT LIBRARY   (F1 = chats)"_q);
+		p.drawText(
+			pad,
+			headerHeight - gap - font->height + font->ascent,
+			u"scripts:"_q);
 	}, overlay->lifetime());
 }
 
@@ -592,7 +684,7 @@ uint64 MainWidget::activeScriptedPeerId() const {
 		return 0;
 	}
 	const auto bareId = history->peer->id.value;
-	return Core::App().settings().scriptedPeer(bareId) ? bareId : 0;
+	return Core::App().settings().chatScript(bareId).isEmpty() ? 0 : bareId;
 }
 
 void MainWidget::setupScriptPanel() {
@@ -603,12 +695,14 @@ void MainWidget::setupScriptPanel() {
 	const auto browser = Ui::CreateChild<QTextBrowser>(panel);
 	browser->setFrameShape(QFrame::NoFrame);
 	browser->setOpenExternalLinks(false);
+	browser->setOpenLinks(false);
 	browser->setStyleSheet(
 		u"QTextBrowser{background:%1;color:%2;border:none;}"_q.arg(
 			st::windowBg->c.name(),
 			st::windowSubTextFg->c.name()));
 	browser->show();
 
+	// Reads persisted state only (no script execution) to avoid update loops.
 	const auto refresh = [=] {
 		const auto bareId = activeScriptedPeerId();
 		if (!bareId || !_scripts) {
@@ -625,6 +719,33 @@ void MainWidget::setupScriptPanel() {
 				+ u"</pre>"_q);
 		}
 	};
+
+	// Runs the bound script for an event; persisting fires updates -> refresh.
+	const auto fire = [=](const QString &type, const QString &target) {
+		const auto bareId = activeScriptedPeerId();
+		if (!bareId || !_scripts) {
+			return;
+		}
+		auto event = QJsonObject();
+		event.insert(u"type"_q, type);
+		if (!target.isEmpty()) {
+			event.insert(u"target"_q, target);
+		}
+		_scripts->runEvent(bareId, QString::fromUtf8(
+			QJsonDocument(event).toJson(QJsonDocument::Compact)));
+	};
+
+	QObject::connect(
+		browser,
+		&QTextBrowser::anchorClicked,
+		browser,
+		[=](const QUrl &url) {
+			auto target = url.toString();
+			if (target.startsWith(u"tg://"_q)) {
+				target = target.mid(5);
+			}
+			fire(u"click"_q, target);
+		});
 
 	panel->sizeValue() | rpl::on_next([=](QSize size) {
 		browser->setGeometry(
@@ -643,6 +764,8 @@ void MainWidget::setupScriptPanel() {
 	) | rpl::on_next([=](const Dialogs::Key&) {
 		updateControlsGeometry();
 		refresh();
+		// Let the script (re)build its UI when the chat opens.
+		fire(u"render"_q, QString());
 	}, panel->lifetime());
 
 	if (_scripts) {

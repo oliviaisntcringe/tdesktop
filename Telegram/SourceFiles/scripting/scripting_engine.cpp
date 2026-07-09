@@ -61,12 +61,13 @@ QString Engine::eval(const QString &code) {
 
 QString Engine::run(
 		const QString &script,
-		const QString &messageJson,
+		const QString &eventJson,
 		const QString &stateJson) {
-	const auto message = messageJson.isEmpty() ? u"null"_q : messageJson;
+	const auto event = eventJson.isEmpty() ? u"{}"_q : eventJson;
 	const auto state = stateJson.isEmpty() ? u"{}"_q : stateJson;
 	const auto wrapper = u"(function(){\n"_q
-		+ u"var message = "_q + message + u";\n"_q
+		+ u"var event = ("_q + event + u");\n"_q
+		+ u"var message = event.message || null;\n"_q
 		+ u"var state = ("_q + state + u");\n"_q
 		+ script + u"\n"_q
 		+ u"return JSON.stringify(state);\n"_q

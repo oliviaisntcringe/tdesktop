@@ -22,11 +22,12 @@ public:
 
 	[[nodiscard]] QString eval(const QString &code);
 
-	// Runs `script` with `message` and `state` JS objects in scope
+	// Runs `script` with `event` and `state` JS objects in scope
 	// (both given as JSON), returns the updated `state` as a JSON string.
+	// `event` carries {type:"render"|"click"|"message"|"run", ...}.
 	[[nodiscard]] QString run(
 		const QString &script,
-		const QString &messageJson,
+		const QString &eventJson,
 		const QString &stateJson);
 
 private:
