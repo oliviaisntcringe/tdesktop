@@ -23,6 +23,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "base/unixtime.h"
 #include "core/core_settings.h"
 #include "core/update_checker.h"
+#include "scripting/scripting_engine.h"
 #include "core/shortcuts.h"
 #include "core/sandbox.h"
 #include "core/local_url_handlers.h"
@@ -276,6 +277,12 @@ void Application::run() {
 	}
 	style::SetCustomFont(settings().customFontFamily());
 	style::internal::StartFonts();
+
+	{
+		auto engine = Scripting::Engine();
+		LOG(("Scripting: QuickJS check, 2 + 3 * 4 = %1"
+			).arg(engine.eval(u"2 + 3 * 4"_q)));
+	}
 
 	ValidateScale();
 

@@ -53,8 +53,15 @@ endif()
 
 set_target_properties(Telegram PROPERTIES AUTOMOC ON)
 
+set(QJS_ENABLE_INSTALL OFF CACHE BOOL "" FORCE)
+set(QJS_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+add_subdirectory(ThirdParty/quickjs EXCLUDE_FROM_ALL)
+set_target_properties(qjs PROPERTIES COMPILE_WARNING_AS_ERROR OFF)
+target_compile_options(qjs PRIVATE -w)
+
 target_link_libraries(Telegram
 PRIVATE
+    qjs
     tdesktop::lib_tgcalls
     tdesktop::td_export
     tdesktop::td_iv
@@ -562,6 +569,8 @@ PRIVATE
     core/sandbox.h
     core/shortcuts.cpp
     core/shortcuts.h
+    scripting/scripting_engine.cpp
+    scripting/scripting_engine.h
     core/ui_integration.cpp
     core/ui_integration.h
     core/update_checker.cpp

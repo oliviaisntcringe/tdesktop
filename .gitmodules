@@ -100,3 +100,6 @@
 [submodule "Telegram/ThirdParty/TooManyCooks"]
 	path = Telegram/ThirdParty/TooManyCooks
 	url = https://github.com/tzcnt/TooManyCooks.git
+[submodule "Telegram/ThirdParty/quickjs"]
+	path = Telegram/ThirdParty/quickjs
+	url = https://github.com/quickjs-ng/quickjs
