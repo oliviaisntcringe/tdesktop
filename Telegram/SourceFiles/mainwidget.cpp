@@ -57,6 +57,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "history/history_item_helpers.h" // GetErrorForSending.
 #include "history/history_item.h"
 #include "scripting/scripting_manager.h"
+#include "ui/widgets/fields/input_field.h"
 #include "history/view/media/history_view_media.h"
 #include "history/view/history_view_chat_section.h"
 #include "history/view/history_view_service_message.h"
@@ -98,6 +99,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "storage/storage_user_photos.h"
 #include "styles/style_dialogs.h"
 #include "styles/style_chat.h"
+#include "styles/style_widgets.h"
 #include "styles/style_window.h"
 
 #include <QtCore/QCoreApplication>
@@ -530,52 +532,50 @@ void MainWidget::showScriptsWorkspace(bool show) {
 	overlay->raise();
 	overlay->show();
 
+	const auto font = st::windowFrameStatusFont;
+	const auto pad = font->height * 2;
+	const auto headerHeight = font->height * 4;
+
+	const auto editor = Ui::CreateChild<Ui::InputField>(
+		overlay,
+		st::defaultInputField,
+		Ui::InputField::Mode::MultiLine,
+		rpl::single(u"// JS with `message` and `state` in scope"_q),
+		_scripts ? _scripts->script() : QString());
+	editor->show();
+
+	const auto save = Ui::CreateChild<Ui::RoundButton>(
+		overlay,
+		rpl::single(u"Save & apply"_q),
+		st::defaultActiveButton);
+	save->show();
+	save->setClickedCallback([=] {
+		if (_scripts) {
+			_scripts->setScript(editor->getLastText());
+		}
+	});
+
 	sizeValue() | rpl::on_next([=](QSize size) {
 		overlay->setGeometry(QRect(QPoint(), size));
+		const auto width = std::max(size.width() - 2 * pad, 0);
+		save->resizeToWidth(width);
+		const auto buttonTop = size.height() - pad - save->height();
+		save->moveToLeft(pad, buttonTop);
+		const auto top = headerHeight;
+		const auto height = std::max(buttonTop - pad - top, font->height);
+		editor->setGeometry(pad, top, width, height);
 	}, overlay->lifetime());
 
 	overlay->paintRequest() | rpl::on_next([=](QRect) {
 		auto p = QPainter(overlay);
 		p.fillRect(overlay->rect(), st::windowBg);
-		const auto font = st::windowFrameStatusFont;
 		p.setFont(font);
 		p.setPen(st::windowSubTextFg->c);
-		const auto step = font->height * 3 / 2;
-		auto y = step + font->ascent;
-		const auto draw = [&](const QString &line) {
-			if (!line.isEmpty()) {
-				p.drawText(step, y, line);
-			}
-			y += step;
-		};
-		draw(u"tuerlegram :: SCRIPTS WORKSPACE"_q);
-		draw(QString());
-		draw(u"Attached scripts (message counter):"_q);
-		draw(QString());
-		const auto peers = Core::App().settings().scriptedPeers();
-		if (peers.empty()) {
-			draw(u"  none. right-click a chat -> Run script here."_q);
-		} else {
-			for (const auto bareId : peers) {
-				const auto peer = session().data().peerLoaded(PeerId(bareId));
-				const auto name = peer
-					? peer->name()
-					: QString::number(bareId);
-				const auto state = _scripts
-					? _scripts->state(bareId)
-					: QString();
-				draw(u"  "_q + name + u"   "_q + state);
-			}
-		}
-		draw(QString());
-		draw(u"press F1 to return to chats."_q);
+		p.drawText(
+			pad,
+			font->height + font->ascent,
+			u"tuerlegram :: SCRIPT EDITOR   (F1 = chats)"_q);
 	}, overlay->lifetime());
-
-	if (_scripts) {
-		_scripts->updates() | rpl::on_next([=] {
-			overlay->update();
-		}, overlay->lifetime());
-	}
 }
 
 uint64 MainWidget::activeScriptedPeerId() const {

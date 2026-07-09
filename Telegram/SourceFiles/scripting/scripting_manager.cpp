@@ -36,8 +36,10 @@ if (message) {
 [[nodiscard]] QString MessageJson(not_null<HistoryItem*> item) {
 	auto object = QJsonObject();
 	object.insert(u"text"_q, item->originalText().text);
+	object.insert(u"author"_q, item->from()->name());
 	object.insert(u"out"_q, item->out());
 	object.insert(u"id"_q, double(item->id.bare));
+	object.insert(u"date"_q, double(item->date()));
 	return QString::fromUtf8(
 		QJsonDocument(object).toJson(QJsonDocument::Compact));
 }
@@ -45,7 +47,8 @@ if (message) {
 } // namespace
 
 Manager::Manager(not_null<Main::Session*> session)
-: _session(session) {
+: _session(session)
+, _script(loadScript()) {
 	_session->changes().messageUpdates(
 		Data::MessageUpdate::Flag::NewAdded
 	) | rpl::on_next([=](const Data::MessageUpdate &update) {
@@ -63,7 +66,7 @@ void Manager::process(not_null<HistoryItem*> item) {
 		return;
 	}
 	const auto updated = _engine.run(
-		QString::fromUtf8(kCounterScript),
+		_script,
 		MessageJson(item),
 		readState(bareId));
 	writeState(bareId, updated);
@@ -99,6 +102,34 @@ QString Manager::state(uint64 peerId) {
 
 rpl::producer<> Manager::updates() const {
 	return _updates.events();
+}
+
+QString Manager::scriptPath() const {
+	return cWorkingDir() + u"scripts/user_script.js"_q;
+}
+
+QString Manager::loadScript() const {
+	auto file = QFile(scriptPath());
+	if (file.open(QIODevice::ReadOnly)) {
+		const auto text = QString::fromUtf8(file.readAll());
+		if (!text.trimmed().isEmpty()) {
+			return text;
+		}
+	}
+	return QString::fromUtf8(kCounterScript);
+}
+
+QString Manager::script() const {
+	return _script;
+}
+
+void Manager::setScript(const QString &text) {
+	_script = text;
+	QDir().mkpath(cWorkingDir() + u"scripts"_q);
+	auto file = QFile(scriptPath());
+	if (file.open(QIODevice::WriteOnly)) {
+		file.write(text.toUtf8());
+	}
 }
 
 } // namespace Scripting
