@@ -104,7 +104,10 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 #include <QtCore/QCoreApplication>
 #include <QtCore/QMimeData>
+#include <QtCore/QJsonDocument>
+#include <QtCore/QJsonObject>
 #include <QtWidgets/QApplication>
+#include <QtWidgets/QTextBrowser>
 
 namespace {
 
@@ -536,12 +539,16 @@ void MainWidget::showScriptsWorkspace(bool show) {
 	const auto pad = font->height * 2;
 	const auto headerHeight = font->height * 4;
 
+	const auto history = _controller->activeChatCurrent().history();
+	const auto bareId = history ? history->peer->id.value : uint64(0);
+	const auto chatName = history ? history->peer->name() : u"(open a chat)"_q;
+
 	const auto editor = Ui::CreateChild<Ui::InputField>(
 		overlay,
 		st::defaultInputField,
 		Ui::InputField::Mode::MultiLine,
 		rpl::single(u"// JS with `message` and `state` in scope"_q),
-		_scripts ? _scripts->script() : QString());
+		(_scripts && bareId) ? _scripts->script(bareId) : QString());
 	editor->show();
 
 	const auto save = Ui::CreateChild<Ui::RoundButton>(
@@ -550,8 +557,8 @@ void MainWidget::showScriptsWorkspace(bool show) {
 		st::defaultActiveButton);
 	save->show();
 	save->setClickedCallback([=] {
-		if (_scripts) {
-			_scripts->setScript(editor->getLastText());
+		if (_scripts && bareId) {
+			_scripts->setScript(bareId, editor->getLastText());
 		}
 	});
 
@@ -574,7 +581,7 @@ void MainWidget::showScriptsWorkspace(bool show) {
 		p.drawText(
 			pad,
 			font->height + font->ascent,
-			u"tuerlegram :: SCRIPT EDITOR   (F1 = chats)"_q);
+			u"SCRIPT for "_q + chatName + u"   (F1 = chats)"_q);
 	}, overlay->lifetime());
 }
 
@@ -593,47 +600,58 @@ void MainWidget::setupScriptPanel() {
 	const auto panel = _scriptPanel.data();
 	panel->hide();
 
+	const auto browser = Ui::CreateChild<QTextBrowser>(panel);
+	browser->setFrameShape(QFrame::NoFrame);
+	browser->setOpenExternalLinks(false);
+	browser->setStyleSheet(
+		u"QTextBrowser{background:%1;color:%2;border:none;}"_q.arg(
+			st::windowBg->c.name(),
+			st::windowSubTextFg->c.name()));
+	browser->show();
+
+	const auto refresh = [=] {
+		const auto bareId = activeScriptedPeerId();
+		if (!bareId || !_scripts) {
+			browser->setHtml(u"<p>no script attached here.</p>"_q);
+			return;
+		}
+		const auto stateJson = _scripts->state(bareId);
+		const auto object = QJsonDocument::fromJson(stateJson.toUtf8()).object();
+		if (object.contains(u"html"_q)) {
+			browser->setHtml(object.value(u"html"_q).toString());
+		} else {
+			browser->setHtml(u"<pre>"_q
+				+ (stateJson.isEmpty() ? u"{}"_q : stateJson).toHtmlEscaped()
+				+ u"</pre>"_q);
+		}
+	};
+
+	panel->sizeValue() | rpl::on_next([=](QSize size) {
+		browser->setGeometry(
+			st::lineWidth,
+			0,
+			std::max(size.width() - st::lineWidth, 0),
+			size.height());
+	}, panel->lifetime());
+
 	panel->paintRequest() | rpl::on_next([=](QRect) {
 		auto p = QPainter(panel);
-		p.fillRect(panel->rect(), st::windowBg);
 		p.fillRect(0, 0, st::lineWidth, panel->height(), st::windowSubTextFg);
-		const auto font = st::windowFrameStatusFont;
-		p.setFont(font);
-		p.setPen(st::windowSubTextFg->c);
-		const auto step = font->height * 3 / 2;
-		auto y = step + font->ascent;
-		const auto draw = [&](const QString &line) {
-			if (!line.isEmpty()) {
-				p.drawText(step, y, line);
-			}
-			y += step;
-		};
-		const auto bareId = activeScriptedPeerId();
-		draw(u"[ script panel ]"_q);
-		draw(QString());
-		if (!bareId) {
-			draw(u"no script attached here."_q);
-		} else {
-			const auto peer = session().data().peerLoaded(PeerId(bareId));
-			draw(peer ? peer->name() : QString::number(bareId));
-			draw(QString());
-			const auto state = _scripts ? _scripts->state(bareId) : QString();
-			draw(u"state:"_q);
-			draw(state.isEmpty() ? u"{}"_q : state);
-		}
 	}, panel->lifetime());
 
 	_controller->activeChatValue(
 	) | rpl::on_next([=](const Dialogs::Key&) {
 		updateControlsGeometry();
-		panel->update();
+		refresh();
 	}, panel->lifetime());
 
 	if (_scripts) {
 		_scripts->updates() | rpl::on_next([=] {
-			panel->update();
+			refresh();
 		}, panel->lifetime());
 	}
+
+	refresh();
 }
 
 void MainWidget::showBootSequence() {
