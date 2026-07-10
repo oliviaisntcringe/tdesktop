@@ -8,6 +8,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #pragma once
 
 #include "scripting/scripting_engine.h"
+#include "scripting/scripting_host.h"
 
 class HistoryItem;
 
@@ -48,6 +49,7 @@ private:
 
 	const not_null<Main::Session*> _session;
 	Engine _engine;
+	HostContext _host;
 	rpl::event_stream<> _updates;
 	rpl::lifetime _lifetime;
 

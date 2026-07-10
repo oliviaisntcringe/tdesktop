@@ -30,6 +30,11 @@ public:
 		const QString &eventJson,
 		const QString &stateJson);
 
+	// Raw QuickJS context, for installing host functions (see scripting_host).
+	[[nodiscard]] JSContext *context() const {
+		return _context;
+	}
+
 private:
 	JSRuntime *_runtime = nullptr;
 	JSContext *_context = nullptr;

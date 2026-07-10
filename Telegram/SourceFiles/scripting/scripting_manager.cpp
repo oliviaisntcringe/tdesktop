@@ -44,6 +44,9 @@ std::vector<QString> LibraryScripts() {
 
 Manager::Manager(not_null<Main::Session*> session)
 : _session(session) {
+	_host.session = _session;
+	InstallHost(_engine.context(), &_host);
+
 	_session->changes().messageUpdates(
 		Data::MessageUpdate::Flag::NewAdded
 	) | rpl::on_next([=](const Data::MessageUpdate &update) {
@@ -82,6 +85,7 @@ QString Manager::runEvent(uint64 peerId, const QString &eventJson) {
 	if (code.isEmpty()) {
 		return readState(peerId);
 	}
+	_host.peerId = peerId;
 	const auto updated = _engine.run(code, eventJson, readState(peerId));
 	writeState(peerId, updated);
 	_updates.fire({});

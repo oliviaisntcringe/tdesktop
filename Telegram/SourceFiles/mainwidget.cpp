@@ -553,7 +553,8 @@ void MainWidget::showScriptsWorkspace(bool show) {
 		overlay,
 		st::defaultInputField,
 		Ui::InputField::Mode::MultiLine,
-		rpl::single(u"// JavaScript — `event`, `message`, `state` in scope"_q),
+		rpl::single(
+			u"// JS: event, message, state, tg.{log,send,currentChat}"_q),
 		QString());
 	editor->show();
 

@@ -571,6 +571,8 @@ PRIVATE
     core/shortcuts.h
     scripting/scripting_engine.cpp
     scripting/scripting_engine.h
+    scripting/scripting_host.cpp
+    scripting/scripting_host.h
     scripting/scripting_manager.cpp
     scripting/scripting_manager.h
     core/ui_integration.cpp
