@@ -12,15 +12,20 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "apiwrap.h"
 #include "api/api_common.h"
 #include "data/data_session.h"
+#include "data/data_histories.h"
 #include "data/data_peer.h"
 #include "data/data_media_types.h"
 #include "data/data_document.h"
 #include "data/data_photo.h"
 #include "data/data_photo_media.h"
 #include "data/data_file_origin.h"
+#include "dialogs/dialogs_main_list.h"
+#include "dialogs/dialogs_indexed_list.h"
+#include "dialogs/dialogs_row.h"
 #include "history/history.h"
 #include "history/history_item.h"
 #include "history/view/history_view_element.h"
+#include "ui/toast/toast.h"
 #include "base/debug_log.h"
 
 #include <quickjs.h>
@@ -202,6 +207,80 @@ JSValue TgDownload(JSContext *ctx, JSValueConst, int argc, JSValueConst *argv) {
 	return JS_NULL;
 }
 
+JSValue TgMarkRead(JSContext *ctx, JSValueConst, int, JSValueConst *) {
+	const auto host = GetHost(ctx);
+	if (!host || !host->session || !host->peerId) {
+		return JS_FALSE;
+	}
+	const auto history = host->session->data().history(PeerId(host->peerId));
+	host->session->data().histories().readInbox(history);
+	return JS_TRUE;
+}
+
+JSValue TgNotify(JSContext *ctx, JSValueConst, int argc, JSValueConst *argv) {
+	if (argc >= 1) {
+		const auto raw = JS_ToCString(ctx, argv[0]);
+		if (raw) {
+			Ui::Toast::Show(QString::fromUtf8(raw));
+			JS_FreeCString(ctx, raw);
+		}
+	}
+	return JS_UNDEFINED;
+}
+
+JSValue TgDelete(JSContext *ctx, JSValueConst, int argc, JSValueConst *argv) {
+	const auto host = GetHost(ctx);
+	if (!host || !host->session || !host->peerId || argc < 1) {
+		return JS_FALSE;
+	}
+	auto id = int64_t(0);
+	if (JS_ToInt64(ctx, &id, argv[0]) < 0 || !id) {
+		return JS_FALSE;
+	}
+	const auto item = host->session->data().message(
+		PeerId(host->peerId),
+		MsgId(id));
+	if (!item) {
+		return JS_FALSE;
+	}
+	auto revoke = true;
+	if (argc >= 2) {
+		revoke = (JS_ToBool(ctx, argv[1]) == 1);
+	}
+	host->session->data().histories().deleteMessages(
+		{ item->fullId() },
+		revoke);
+	return JS_TRUE;
+}
+
+JSValue TgChats(JSContext *ctx, JSValueConst, int, JSValueConst *) {
+	auto array = JS_NewArray(ctx);
+	const auto host = GetHost(ctx);
+	if (!host || !host->session) {
+		return array;
+	}
+	const auto list = host->session->data().chatsList();
+	auto index = uint32_t(0);
+	for (const auto &row : list->indexed()->all()) {
+		const auto history = row->history();
+		if (!history) {
+			continue;
+		}
+		const auto peer = history->peer;
+		auto object = JS_NewObject(ctx);
+		JS_SetPropertyStr(ctx, object, "id", JS_NewString(
+			ctx,
+			QString::number(peer->id.value).toUtf8().constData()));
+		JS_SetPropertyStr(ctx, object, "name", JS_NewString(
+			ctx,
+			peer->name().toUtf8().constData()));
+		JS_SetPropertyStr(ctx, object, "unread",
+			JS_NewInt32(ctx, history->unreadCount()));
+		JS_SetPropertyUint32(ctx, array, index++, object);
+	}
+	return array;
+}
+
 } // namespace
 
 void InstallHost(JSContext *context, HostContext *host) {
@@ -236,6 +315,26 @@ void InstallHost(JSContext *context, HostContext *host) {
 		tg,
 		"download",
 		JS_NewCFunction(context, TgDownload, "download", 1));
+	JS_SetPropertyStr(
+		context,
+		tg,
+		"markRead",
+		JS_NewCFunction(context, TgMarkRead, "markRead", 0));
+	JS_SetPropertyStr(
+		context,
+		tg,
+		"notify",
+		JS_NewCFunction(context, TgNotify, "notify", 1));
+	JS_SetPropertyStr(
+		context,
+		tg,
+		"del",
+		JS_NewCFunction(context, TgDelete, "del", 2));
+	JS_SetPropertyStr(
+		context,
+		tg,
+		"chats",
+		JS_NewCFunction(context, TgChats, "chats", 0));
 	JS_SetPropertyStr(context, global, "tg", tg);
 	JS_FreeValue(context, global);
 }

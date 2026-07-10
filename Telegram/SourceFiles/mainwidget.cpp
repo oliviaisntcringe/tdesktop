@@ -736,6 +736,37 @@ void MainWidget::setupScriptPanel() {
 			QJsonDocument(event).toJson(QJsonDocument::Compact)));
 	};
 
+	// Real-time: a script opts in by setting state.tick (ms, or true = 120).
+	// The timer then fires "tick" events to the active scripted chat.
+	const auto updateTick = [=] {
+		const auto bareId = activeScriptedPeerId();
+		if (!bareId || !_scripts) {
+			_scriptTick.cancel();
+			return;
+		}
+		const auto object = QJsonDocument::fromJson(
+			_scripts->state(bareId).toUtf8()).object();
+		const auto value = object.value(u"tick"_q);
+		auto ms = 0;
+		if (value.isDouble()) {
+			ms = int(value.toDouble());
+		} else if (value.isBool() && value.toBool()) {
+			ms = 120;
+		}
+		if (ms > 0) {
+			_scriptTick.callEach(std::clamp(ms, 30, 5000));
+		} else {
+			_scriptTick.cancel();
+		}
+	};
+	_scriptTick.setCallback([=] {
+		if (activeScriptedPeerId() && _scripts) {
+			fire(u"tick"_q, QString());
+		} else {
+			_scriptTick.cancel();
+		}
+	});
+
 	QObject::connect(
 		browser,
 		&QTextBrowser::anchorClicked,
@@ -767,11 +798,13 @@ void MainWidget::setupScriptPanel() {
 		refresh();
 		// Let the script (re)build its UI when the chat opens.
 		fire(u"render"_q, QString());
+		updateTick();
 	}, panel->lifetime());
 
 	if (_scripts) {
 		_scripts->updates() | rpl::on_next([=] {
 			refresh();
+			updateTick();
 		}, panel->lifetime());
 	}
 

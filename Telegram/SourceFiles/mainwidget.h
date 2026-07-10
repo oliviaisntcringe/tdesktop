@@ -8,6 +8,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #pragma once
 
 #include "base/weak_ptr.h"
+#include "base/timer.h"
 #include "media/player/media_player_float.h"
 #include "mtproto/sender.h"
 
@@ -367,6 +368,7 @@ private:
 	int _bootShown = 0;
 	object_ptr<Ui::RpWidget> _scriptsOverlay = { nullptr };
 	object_ptr<Ui::RpWidget> _scriptPanel = { nullptr };
+	base::Timer _scriptTick;
 	crl::time _lastLoudAlert = 0;
 	object_ptr<Ui::PlainShadow> _thirdShadow = { nullptr };
 	object_ptr<Ui::ResizeArea> _firstColumnResizeArea = { nullptr };
