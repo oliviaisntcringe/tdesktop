@@ -31,6 +31,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include <quickjs.h>
 
 #include <QtCore/QDir>
+#include <QtCore/QFileInfo>
 
 namespace Scripting {
 namespace {
@@ -253,6 +254,64 @@ JSValue TgDelete(JSContext *ctx, JSValueConst, int argc, JSValueConst *argv) {
 	return JS_TRUE;
 }
 
+// Maps a script-supplied name to a file under scripts/data/, stripping any
+// directory components so a script can't escape the sandbox.
+[[nodiscard]] QString SandboxPath(JSContext *ctx, JSValueConst arg) {
+	const auto raw = JS_ToCString(ctx, arg);
+	if (!raw) {
+		return QString();
+	}
+	const auto name = QFileInfo(QString::fromUtf8(raw)).fileName();
+	JS_FreeCString(ctx, raw);
+	if (name.isEmpty()) {
+		return QString();
+	}
+	return cWorkingDir() + u"scripts/data/"_q + name;
+}
+
+JSValue TgReadFile(JSContext *ctx, JSValueConst, int argc, JSValueConst *argv) {
+	if (argc < 1) {
+		return JS_NULL;
+	}
+	const auto path = SandboxPath(ctx, argv[0]);
+	if (path.isEmpty()) {
+		return JS_NULL;
+	}
+	auto file = QFile(path);
+	if (!file.open(QIODevice::ReadOnly)) {
+		return JS_NULL;
+	}
+	const auto utf8 = QString::fromUtf8(file.readAll()).toUtf8();
+	return JS_NewString(ctx, utf8.constData());
+}
+
+JSValue TgWriteFile(
+		JSContext *ctx,
+		JSValueConst,
+		int argc,
+		JSValueConst *argv) {
+	if (argc < 2) {
+		return JS_FALSE;
+	}
+	const auto path = SandboxPath(ctx, argv[0]);
+	if (path.isEmpty()) {
+		return JS_FALSE;
+	}
+	const auto raw = JS_ToCString(ctx, argv[1]);
+	if (!raw) {
+		return JS_FALSE;
+	}
+	const auto content = QByteArray(raw);
+	JS_FreeCString(ctx, raw);
+	QDir().mkpath(cWorkingDir() + u"scripts/data"_q);
+	auto file = QFile(path);
+	if (!file.open(QIODevice::WriteOnly)) {
+		return JS_FALSE;
+	}
+	file.write(content);
+	return JS_TRUE;
+}
+
 JSValue TgChats(JSContext *ctx, JSValueConst, int, JSValueConst *) {
 	auto array = JS_NewArray(ctx);
 	const auto host = GetHost(ctx);
@@ -335,6 +394,16 @@ void InstallHost(JSContext *context, HostContext *host) {
 		tg,
 		"chats",
 		JS_NewCFunction(context, TgChats, "chats", 0));
+	JS_SetPropertyStr(
+		context,
+		tg,
+		"readFile",
+		JS_NewCFunction(context, TgReadFile, "readFile", 1));
+	JS_SetPropertyStr(
+		context,
+		tg,
+		"writeFile",
+		JS_NewCFunction(context, TgWriteFile, "writeFile", 2));
 	JS_SetPropertyStr(context, global, "tg", tg);
 	JS_FreeValue(context, global);
 }

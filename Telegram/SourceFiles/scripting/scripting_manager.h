@@ -9,6 +9,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 #include "scripting/scripting_engine.h"
 #include "scripting/scripting_host.h"
+#include "base/weak_ptr.h"
 
 class HistoryItem;
 
@@ -21,7 +22,7 @@ namespace Scripting {
 // Names of scripts in the library (files under scripts/lib/), filesystem-read.
 [[nodiscard]] std::vector<QString> LibraryScripts();
 
-class Manager final {
+class Manager final : public base::has_weak_ptr {
 public:
 	explicit Manager(not_null<Main::Session*> session);
 
@@ -46,6 +47,7 @@ public:
 private:
 	void process(not_null<HistoryItem*> item);
 	void emitItemEvent(not_null<HistoryItem*> item, const QString &type);
+	void emitDeletedEvent(not_null<HistoryItem*> item);
 	[[nodiscard]] QString libraryPath(const QString &name) const;
 	[[nodiscard]] QString statePath(uint64 peerId) const;
 	[[nodiscard]] QString readState(uint64 peerId) const;

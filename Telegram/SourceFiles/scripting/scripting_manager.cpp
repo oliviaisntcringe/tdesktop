@@ -64,6 +64,10 @@ Manager::Manager(not_null<Main::Session*> session)
 	) | rpl::on_next([=](const Data::MessageUpdate &update) {
 		emitItemEvent(update.item, u"reaction"_q);
 	}, _lifetime);
+	_session->data().messageDeletedKept(
+	) | rpl::on_next([=](not_null<HistoryItem*> item) {
+		emitDeletedEvent(item);
+	}, _lifetime);
 
 	// Complete deferred photo downloads (tg.download) as they finish.
 	_session->downloaderTaskFinished(
@@ -100,6 +104,38 @@ void Manager::emitItemEvent(
 	event.insert(u"message"_q, message);
 	runEvent(bareId, QString::fromUtf8(
 		QJsonDocument(event).toJson(QJsonDocument::Compact)));
+}
+
+void Manager::emitDeletedEvent(not_null<HistoryItem*> item) {
+	if (!item->isRegular()) {
+		return;
+	}
+	const auto bareId = item->history()->peer->id.value;
+	if (Core::App().settings().chatScript(bareId).isEmpty()) {
+		return;
+	}
+	// Strip the " [deleted]" marker so the script sees the original text.
+	auto text = item->originalText().text;
+	const auto marker = u" [deleted]"_q;
+	if (text.endsWith(marker)) {
+		text.chop(marker.size());
+	}
+	auto message = QJsonObject();
+	message.insert(u"text"_q, text);
+	message.insert(u"author"_q, item->from()->name());
+	message.insert(u"out"_q, item->out());
+	message.insert(u"id"_q, double(item->id.bare));
+	message.insert(u"date"_q, double(item->date()));
+	auto event = QJsonObject();
+	event.insert(u"type"_q, u"delete"_q);
+	event.insert(u"message"_q, message);
+	const auto json = QString::fromUtf8(
+		QJsonDocument(event).toJson(QJsonDocument::Compact));
+	// Deferred: the signal fires mid delete-processing; running JS (which may
+	// touch the message list) synchronously there is unsafe.
+	crl::on_main(this, [=] {
+		runEvent(bareId, json);
+	});
 }
 
 QString Manager::runEvent(uint64 peerId, const QString &eventJson) {

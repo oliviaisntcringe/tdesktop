@@ -3053,8 +3053,13 @@ bool Session::keepDeletedMessage(not_null<HistoryItem*> item) {
 		item->setText(std::move(text));
 		requestItemViewRefresh(item);
 		requestItemResize(item);
+		_messageDeletedKept.fire_copy(item);
 	}
 	return true;
+}
+
+rpl::producer<not_null<HistoryItem*>> Session::messageDeletedKept() const {
+	return _messageDeletedKept.events();
 }
 
 void Session::removeDependencyMessage(not_null<HistoryItem*> item) {

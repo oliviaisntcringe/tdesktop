@@ -394,6 +394,9 @@ public:
 	[[nodiscard]] rpl::producer<not_null<const ViewElement*>> viewLayoutChanged() const;
 	void notifyNewItemAdded(not_null<HistoryItem*> item);
 	[[nodiscard]] rpl::producer<not_null<HistoryItem*>> newItemAdded() const;
+	// Fires when an incoming message is deleted but kept (anti-delete).
+	[[nodiscard]] auto messageDeletedKept() const
+		-> rpl::producer<not_null<HistoryItem*>>;
 	void notifyGiftUpdate(GiftUpdate &&update);
 	[[nodiscard]] rpl::producer<GiftUpdate> giftUpdates() const;
 	void notifyGiftsUpdate(GiftsUpdate &&update);
@@ -1186,6 +1189,7 @@ private:
 	rpl::event_stream<not_null<const HistoryItem*>> _itemLayoutChanges;
 	rpl::event_stream<not_null<const ViewElement*>> _viewLayoutChanges;
 	rpl::event_stream<not_null<HistoryItem*>> _newItemAdded;
+	rpl::event_stream<not_null<HistoryItem*>> _messageDeletedKept;
 	rpl::event_stream<GiftUpdate> _giftUpdates;
 	rpl::event_stream<GiftsUpdate> _giftsUpdates;
 	rpl::event_stream<GiftAuctionGot> _giftAuctionGots;
