@@ -710,15 +710,23 @@ void MainWidget::setupScriptPanel() {
 			browser->setHtml(u"<p>no script attached here.</p>"_q);
 			return;
 		}
+		auto html = QString();
+		const auto error = _scripts->lastError(bareId);
+		if (!error.isEmpty()) {
+			html += u"<div style=\"color:#ff5555;font-family:monospace;padding:4px\">"_q
+				+ error.toHtmlEscaped()
+				+ u"</div>"_q;
+		}
 		const auto stateJson = _scripts->state(bareId);
 		const auto object = QJsonDocument::fromJson(stateJson.toUtf8()).object();
 		if (object.contains(u"html"_q)) {
-			browser->setHtml(object.value(u"html"_q).toString());
+			html += object.value(u"html"_q).toString();
 		} else {
-			browser->setHtml(u"<pre>"_q
+			html += u"<pre>"_q
 				+ (stateJson.isEmpty() ? u"{}"_q : stateJson).toHtmlEscaped()
-				+ u"</pre>"_q);
+				+ u"</pre>"_q;
 		}
+		browser->setHtml(html);
 	};
 
 	// Runs the bound script for an event; persisting fires updates -> refresh.

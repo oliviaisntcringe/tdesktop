@@ -40,8 +40,12 @@ public:
 	// Fires whenever any chat's state changes.
 	[[nodiscard]] rpl::producer<> updates() const;
 
+	// Last uncaught error from a peer's script (empty if none / other peer).
+	[[nodiscard]] QString lastError(uint64 peerId) const;
+
 private:
 	void process(not_null<HistoryItem*> item);
+	void emitItemEvent(not_null<HistoryItem*> item, const QString &type);
 	[[nodiscard]] QString libraryPath(const QString &name) const;
 	[[nodiscard]] QString statePath(uint64 peerId) const;
 	[[nodiscard]] QString readState(uint64 peerId) const;
@@ -51,6 +55,8 @@ private:
 	Engine _engine;
 	HostContext _host;
 	rpl::event_stream<> _updates;
+	QString _lastError;
+	uint64 _lastErrorPeer = 0;
 	rpl::lifetime _lifetime;
 
 };

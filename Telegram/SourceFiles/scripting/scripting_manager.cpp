@@ -16,6 +16,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/data_peer.h"
 #include "history/history.h"
 #include "history/history_item.h"
+#include "base/debug_log.h"
 
 #include <QtCore/QDir>
 #include <QtCore/QFile>
@@ -47,10 +48,21 @@ Manager::Manager(not_null<Main::Session*> session)
 	_host.session = _session;
 	InstallHost(_engine.context(), &_host);
 
+	using Flag = Data::MessageUpdate::Flag;
 	_session->changes().messageUpdates(
-		Data::MessageUpdate::Flag::NewAdded
+		Flag::NewAdded
 	) | rpl::on_next([=](const Data::MessageUpdate &update) {
 		process(update.item);
+	}, _lifetime);
+	_session->changes().messageUpdates(
+		Flag::Edited
+	) | rpl::on_next([=](const Data::MessageUpdate &update) {
+		emitItemEvent(update.item, u"edit"_q);
+	}, _lifetime);
+	_session->changes().messageUpdates(
+		Flag::NewUnreadReaction
+	) | rpl::on_next([=](const Data::MessageUpdate &update) {
+		emitItemEvent(update.item, u"reaction"_q);
 	}, _lifetime);
 
 	// Complete deferred photo downloads (tg.download) as they finish.
@@ -64,8 +76,16 @@ void Manager::process(not_null<HistoryItem*> item) {
 	if (item->out() || !item->isRegular()) {
 		return;
 	}
-	const auto peer = item->history()->peer;
-	const auto bareId = peer->id.value;
+	emitItemEvent(item, u"message"_q);
+}
+
+void Manager::emitItemEvent(
+		not_null<HistoryItem*> item,
+		const QString &type) {
+	if (!item->isRegular()) {
+		return;
+	}
+	const auto bareId = item->history()->peer->id.value;
 	if (Core::App().settings().chatScript(bareId).isEmpty()) {
 		return;
 	}
@@ -76,7 +96,7 @@ void Manager::process(not_null<HistoryItem*> item) {
 	message.insert(u"id"_q, double(item->id.bare));
 	message.insert(u"date"_q, double(item->date()));
 	auto event = QJsonObject();
-	event.insert(u"type"_q, u"message"_q);
+	event.insert(u"type"_q, type);
 	event.insert(u"message"_q, message);
 	runEvent(bareId, QString::fromUtf8(
 		QJsonDocument(event).toJson(QJsonDocument::Compact)));
@@ -93,9 +113,25 @@ QString Manager::runEvent(uint64 peerId, const QString &eventJson) {
 	}
 	_host.peerId = peerId;
 	const auto updated = _engine.run(code, eventJson, readState(peerId));
+	if (updated.startsWith(u"error:"_q)) {
+		// A thrown script keeps the last good state instead of clobbering it.
+		_lastError = updated;
+		_lastErrorPeer = peerId;
+		LOG(("Script error [%1]: %2").arg(name, updated));
+		_updates.fire({});
+		return readState(peerId);
+	}
+	if (_lastErrorPeer == peerId) {
+		_lastError = QString();
+		_lastErrorPeer = 0;
+	}
 	writeState(peerId, updated);
 	_updates.fire({});
 	return updated;
+}
+
+QString Manager::lastError(uint64 peerId) const {
+	return (_lastErrorPeer == peerId) ? _lastError : QString();
 }
 
 QString Manager::libraryPath(const QString &name) const {
