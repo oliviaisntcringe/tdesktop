@@ -170,6 +170,11 @@ QString Manager::lastError(uint64 peerId) const {
 	return (_lastErrorPeer == peerId) ? _lastError : QString();
 }
 
+QString Manager::testRun(uint64 peerId, const QString &code) {
+	_host.peerId = peerId;
+	return _engine.run(code, u"{\"type\":\"run\"}"_q, readState(peerId));
+}
+
 QString Manager::libraryPath(const QString &name) const {
 	return cWorkingDir() + u"scripts/lib/"_q + name + u".js"_q;
 }

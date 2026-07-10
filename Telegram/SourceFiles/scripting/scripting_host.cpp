@@ -19,6 +19,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/data_photo.h"
 #include "data/data_photo_media.h"
 #include "data/data_file_origin.h"
+#include "data/data_message_reaction_id.h"
+#include "data/data_messages.h"
 #include "dialogs/dialogs_main_list.h"
 #include "dialogs/dialogs_indexed_list.h"
 #include "dialogs/dialogs_row.h"
@@ -312,6 +314,111 @@ JSValue TgWriteFile(
 	return JS_TRUE;
 }
 
+[[nodiscard]] HistoryItem *ItemArg(
+		JSContext *ctx,
+		HostContext *host,
+		JSValueConst arg) {
+	auto id = int64_t(0);
+	if (JS_ToInt64(ctx, &id, arg) < 0 || !id) {
+		return nullptr;
+	}
+	return host->session->data().message(PeerId(host->peerId), MsgId(id));
+}
+
+JSValue TgReact(JSContext *ctx, JSValueConst, int argc, JSValueConst *argv) {
+	const auto host = GetHost(ctx);
+	if (!host || !host->session || !host->peerId || argc < 2) {
+		return JS_FALSE;
+	}
+	const auto item = ItemArg(ctx, host, argv[0]);
+	if (!item) {
+		return JS_FALSE;
+	}
+	const auto raw = JS_ToCString(ctx, argv[1]);
+	if (!raw) {
+		return JS_FALSE;
+	}
+	const auto emoji = QString::fromUtf8(raw);
+	JS_FreeCString(ctx, raw);
+	item->toggleReaction(
+		Data::ReactionId{ emoji },
+		HistoryReactionSource::Selector);
+	return JS_TRUE;
+}
+
+JSValue TgForward(JSContext *ctx, JSValueConst, int argc, JSValueConst *argv) {
+	const auto host = GetHost(ctx);
+	if (!host || !host->session || !host->peerId || argc < 2) {
+		return JS_FALSE;
+	}
+	const auto item = ItemArg(ctx, host, argv[0]);
+	if (!item) {
+		return JS_FALSE;
+	}
+	const auto raw = JS_ToCString(ctx, argv[1]);
+	if (!raw) {
+		return JS_FALSE;
+	}
+	const auto toId = QString::fromUtf8(raw).toULongLong();
+	JS_FreeCString(ctx, raw);
+	if (!toId) {
+		return JS_FALSE;
+	}
+	const auto toHistory = host->session->data().history(PeerId(toId));
+	auto draft = Data::ResolvedForwardDraft{
+		HistoryItemsList{ item },
+		Data::ForwardOptions::PreserveInfo,
+	};
+	host->session->api().forwardMessages(
+		std::move(draft),
+		Api::SendAction(toHistory));
+	return JS_TRUE;
+}
+
+JSValue TgPin(JSContext *ctx, JSValueConst, int argc, JSValueConst *argv) {
+	const auto host = GetHost(ctx);
+	if (!host || !host->session || !host->peerId || argc < 1) {
+		return JS_FALSE;
+	}
+	const auto item = ItemArg(ctx, host, argv[0]);
+	if (!item) {
+		return JS_FALSE;
+	}
+	const auto peer = item->history()->peer;
+	const auto session = host->session;
+	const auto flags = MTPmessages_UpdatePinnedMessage::Flags(0);
+	session->api().request(MTPmessages_UpdatePinnedMessage(
+		MTP_flags(flags),
+		peer->input(),
+		MTP_int(item->id)
+	)).done([=](const MTPUpdates &result) {
+		session->api().applyUpdates(result);
+	}).send();
+	return JS_TRUE;
+}
+
+JSValue TgLoadHistory(JSContext *ctx, JSValueConst, int, JSValueConst *) {
+	const auto host = GetHost(ctx);
+	if (!host || !host->session || !host->peerId) {
+		return JS_FALSE;
+	}
+	const auto history = host->session->data().history(PeerId(host->peerId));
+	auto oldest = MsgId(0);
+	for (const auto &block : history->blocks) {
+		for (const auto &view : block->messages) {
+			const auto id = view->data()->id;
+			if (id.bare > 0 && (!oldest.bare || id.bare < oldest.bare)) {
+				oldest = id;
+			}
+		}
+	}
+	host->session->api().requestHistory(
+		history,
+		oldest,
+		Data::LoadDirection::Before);
+	return JS_TRUE;
+}
+
 JSValue TgChats(JSContext *ctx, JSValueConst, int, JSValueConst *) {
 	auto array = JS_NewArray(ctx);
 	const auto host = GetHost(ctx);
@@ -404,6 +511,26 @@ void InstallHost(JSContext *context, HostContext *host) {
 		tg,
 		"writeFile",
 		JS_NewCFunction(context, TgWriteFile, "writeFile", 2));
+	JS_SetPropertyStr(
+		context,
+		tg,
+		"react",
+		JS_NewCFunction(context, TgReact, "react", 2));
+	JS_SetPropertyStr(
+		context,
+		tg,
+		"forward",
+		JS_NewCFunction(context, TgForward, "forward", 2));
+	JS_SetPropertyStr(
+		context,
+		tg,
+		"pin",
+		JS_NewCFunction(context, TgPin, "pin", 1));
+	JS_SetPropertyStr(
+		context,
+		tg,
+		"loadHistory",
+		JS_NewCFunction(context, TgLoadHistory, "loadHistory", 0));
 	JS_SetPropertyStr(context, global, "tg", tg);
 	JS_FreeValue(context, global);
 }

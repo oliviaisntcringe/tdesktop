@@ -38,6 +38,10 @@ public:
 	// Runs a chat's bound script for an event JSON; persists + returns state.
 	QString runEvent(uint64 peerId, const QString &eventJson);
 
+	// Runs arbitrary code once against a peer's state (a "run" event) WITHOUT
+	// persisting — for the F2 test button. Returns the result or "error: ...".
+	QString testRun(uint64 peerId, const QString &code);
+
 	// Fires whenever any chat's state changes.
 	[[nodiscard]] rpl::producer<> updates() const;
 

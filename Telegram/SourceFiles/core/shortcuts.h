@@ -92,6 +92,7 @@ enum class Command {
 
 	Workspace1,
 	Workspace2,
+	ScriptRun,
 };
 
 [[maybe_unused]] constexpr auto kShowFolder = {

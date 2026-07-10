@@ -519,6 +519,13 @@ void MainWidget::setupWorkspaces() {
 			showScriptsWorkspace(true);
 			return true;
 		});
+		request->check(Command::ScriptRun, 1) && request->handle([=] {
+			const auto bareId = activeScriptedPeerId();
+			if (bareId && _scripts) {
+				_scripts->runEvent(bareId, u"{\"type\":\"run\"}"_q);
+			}
+			return true;
+		});
 	}, lifetime());
 }
 
@@ -573,6 +580,11 @@ void MainWidget::showScriptsWorkspace(bool show) {
 		rpl::single(u"Delete"_q),
 		st::defaultLightButton);
 	deleteBtn->show();
+	const auto runBtn = Ui::CreateChild<Ui::RoundButton>(
+		overlay,
+		rpl::single(u"Run"_q),
+		st::defaultLightButton);
+	runBtn->show();
 
 	const auto scripts = _scripts
 		? _scripts->libraryList()
@@ -627,6 +639,15 @@ void MainWidget::showScriptsWorkspace(bool show) {
 		editor->setText(QString());
 		nameField->setFocus();
 	});
+	runBtn->setClickedCallback([=] {
+		if (!_scripts) {
+			return;
+		}
+		const auto history = _controller->activeChatCurrent().history();
+		const auto bareId = history ? history->peer->id.value : uint64(0);
+		const auto out = _scripts->testRun(bareId, editor->getLastText());
+		Ui::Toast::Show(out.isEmpty() ? u"(no output)"_q : out.left(300));
+	});
 
 	sizeValue() | rpl::on_next([=](QSize size) {
 		overlay->setGeometry(QRect(QPoint(), size));
@@ -647,13 +668,15 @@ void MainWidget::showScriptsWorkspace(bool show) {
 		nameField->moveToLeft(editorLeft, headerHeight);
 
 		const auto buttonTop = size.height() - pad - save->height();
-		const auto third = std::max((editorWidth - 2 * gap) / 3, 0);
-		save->resizeToWidth(third);
-		newBtn->resizeToWidth(third);
-		deleteBtn->resizeToWidth(third);
+		const auto quarter = std::max((editorWidth - 3 * gap) / 4, 0);
+		save->resizeToWidth(quarter);
+		runBtn->resizeToWidth(quarter);
+		newBtn->resizeToWidth(quarter);
+		deleteBtn->resizeToWidth(quarter);
 		save->moveToLeft(editorLeft, buttonTop);
-		newBtn->moveToLeft(editorLeft + third + gap, buttonTop);
-		deleteBtn->moveToLeft(editorLeft + 2 * (third + gap), buttonTop);
+		runBtn->moveToLeft(editorLeft + (quarter + gap), buttonTop);
+		newBtn->moveToLeft(editorLeft + 2 * (quarter + gap), buttonTop);
+		deleteBtn->moveToLeft(editorLeft + 3 * (quarter + gap), buttonTop);
 
 		const auto editorTop = headerHeight + nameField->height() + gap;
 		const auto editorHeight = std::max(

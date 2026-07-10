@@ -142,6 +142,7 @@ const auto CommandByName = base::flat_map<QString, Command>{
 	{ u"show_admin_log"_q                , Command::ShowAdminLog },
 	{ u"workspace1"_q                    , Command::Workspace1 },
 	{ u"workspace2"_q                    , Command::Workspace2 },
+	{ u"scriptrun"_q                     , Command::ScriptRun },
 	//
 };
 
@@ -477,6 +478,7 @@ void Manager::fillDefaults() {
 
 	set(u"f1"_q, Command::Workspace1);
 	set(u"f2"_q, Command::Workspace2);
+	set(u"f4"_q, Command::ScriptRun);
 
 	set(u"ctrl+w"_q, Command::Close);
 	set(u"ctrl+f4"_q, Command::Close);
