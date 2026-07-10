@@ -120,6 +120,7 @@ jobs:
 
           ./configure.sh \
           -D CMAKE_CONFIGURATION_TYPES=Debug \
+          -D CMAKE_POLICY_DEFAULT_CMP0218=OLD \
           -D CMAKE_COMPILE_WARNING_AS_ERROR=ON \
           -D CMAKE_XCODE_ATTRIBUTE_CODE_SIGNING_ALLOWED=NO \
           -D DESKTOP_APP_MAC_ARCH=x86_64 \
