@@ -7,15 +7,25 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "scripting/scripting_host.h"
 
+#include "settings.h" // cWorkingDir
 #include "main/main_session.h"
 #include "apiwrap.h"
 #include "api/api_common.h"
 #include "data/data_session.h"
 #include "data/data_peer.h"
+#include "data/data_media_types.h"
+#include "data/data_document.h"
+#include "data/data_photo.h"
+#include "data/data_photo_media.h"
+#include "data/data_file_origin.h"
 #include "history/history.h"
+#include "history/history_item.h"
+#include "history/view/history_view_element.h"
 #include "base/debug_log.h"
 
 #include <quickjs.h>
+
+#include <QtCore/QDir>
 
 namespace Scripting {
 namespace {
@@ -90,6 +100,108 @@ JSValue TgSend(JSContext *ctx, JSValueConst, int argc, JSValueConst *argv) {
 	return JS_TRUE;
 }
 
+[[nodiscard]] const char *MediaType(HistoryItem *item) {
+	const auto media = item->media();
+	if (!media) {
+		return "none";
+	} else if (media->photo()) {
+		return "photo";
+	} else if (media->document()) {
+		return "document";
+	}
+	return "other";
+}
+
+JSValue TgHistory(JSContext *ctx, JSValueConst, int argc, JSValueConst *argv) {
+	auto array = JS_NewArray(ctx);
+	const auto host = GetHost(ctx);
+	if (!host || !host->session || !host->peerId) {
+		return array;
+	}
+	auto limit = 50;
+	if (argc >= 1) {
+		JS_ToInt32(ctx, &limit, argv[0]);
+	}
+	const auto history = host->session->data().history(PeerId(host->peerId));
+	auto items = std::vector<not_null<HistoryItem*>>();
+	for (const auto &block : history->blocks) {
+		for (const auto &view : block->messages) {
+			items.push_back(view->data());
+		}
+	}
+	const auto total = int(items.size());
+	const auto start = (limit > 0 && total > limit) ? (total - limit) : 0;
+	auto index = uint32_t(0);
+	for (auto i = start; i != total; ++i) {
+		const auto item = items[i];
+		auto object = JS_NewObject(ctx);
+		JS_SetPropertyStr(ctx, object, "id",
+			JS_NewInt64(ctx, int64_t(item->id.bare)));
+		JS_SetPropertyStr(ctx, object, "text", JS_NewString(
+			ctx,
+			item->originalText().text.toUtf8().constData()));
+		JS_SetPropertyStr(ctx, object, "author", JS_NewString(
+			ctx,
+			item->from()->name().toUtf8().constData()));
+		JS_SetPropertyStr(ctx, object, "out", JS_NewBool(ctx, item->out()));
+		JS_SetPropertyStr(ctx, object, "date",
+			JS_NewInt64(ctx, int64_t(item->date())));
+		JS_SetPropertyStr(ctx, object, "media",
+			JS_NewString(ctx, MediaType(item)));
+		JS_SetPropertyUint32(ctx, array, index++, object);
+	}
+	return array;
+}
+
+JSValue TgDownload(JSContext *ctx, JSValueConst, int argc, JSValueConst *argv) {
+	const auto host = GetHost(ctx);
+	if (!host || !host->session || !host->peerId || argc < 1) {
+		return JS_NULL;
+	}
+	auto id = int64_t(0);
+	if (JS_ToInt64(ctx, &id, argv[0]) < 0 || !id) {
+		return JS_NULL;
+	}
+	const auto item = host->session->data().message(
+		PeerId(host->peerId),
+		MsgId(id));
+	if (!item) {
+		return JS_NULL;
+	}
+	const auto media = item->media();
+	if (!media) {
+		return JS_NULL;
+	}
+	const auto origin = Data::FileOrigin(item->fullId());
+	const auto dir = cWorkingDir() + u"scripts/downloads/"_q;
+	QDir().mkpath(dir);
+	if (const auto document = media->document()) {
+		auto name = document->filename();
+		name.replace(QChar('/'), QChar('_'));
+		name.replace(QChar('\\'), QChar('_'));
+		if (name.isEmpty()) {
+			name = u"doc_"_q + QString::number(id);
+		}
+		const auto path = dir + name;
+		document->save(origin, path);
+		return JS_NewString(ctx, path.toUtf8().constData());
+	} else if (const auto photo = media->photo()) {
+		const auto path = dir
+			+ u"photo_"_q
+			+ QString::number(id)
+			+ u".jpg"_q;
+		auto view = photo->createMediaView();
+		view->wanted(Data::PhotoSize::Large, origin);
+		if (view->loaded()) {
+			view->saveToFile(path);
+		} else {
+			host->pendingPhotoSaves.push_back({ std::move(view), path });
+		}
+		return JS_NewString(ctx, path.toUtf8().constData());
+	}
+	return JS_NULL;
+}
+
 } // namespace
 
 void InstallHost(JSContext *context, HostContext *host) {
@@ -114,8 +226,33 @@ void InstallHost(JSContext *context, HostContext *host) {
 		tg,
 		"currentChat",
 		JS_NewCFunction(context, TgCurrentChat, "currentChat", 0));
+	JS_SetPropertyStr(
+		context,
+		tg,
+		"history",
+		JS_NewCFunction(context, TgHistory, "history", 1));
+	JS_SetPropertyStr(
+		context,
+		tg,
+		"download",
+		JS_NewCFunction(context, TgDownload, "download", 1));
 	JS_SetPropertyStr(context, global, "tg", tg);
 	JS_FreeValue(context, global);
+}
+
+void DrainPendingDownloads(HostContext *host) {
+	if (!host) {
+		return;
+	}
+	auto &pending = host->pendingPhotoSaves;
+	for (auto i = pending.begin(); i != pending.end();) {
+		if (i->media->loaded()) {
+			i->media->saveToFile(i->path);
+			i = pending.erase(i);
+		} else {
+			++i;
+		}
+	}
 }
 
 } // namespace Scripting

@@ -52,6 +52,12 @@ Manager::Manager(not_null<Main::Session*> session)
 	) | rpl::on_next([=](const Data::MessageUpdate &update) {
 		process(update.item);
 	}, _lifetime);
+
+	// Complete deferred photo downloads (tg.download) as they finish.
+	_session->downloaderTaskFinished(
+	) | rpl::on_next([=] {
+		DrainPendingDownloads(&_host);
+	}, _lifetime);
 }
 
 void Manager::process(not_null<HistoryItem*> item) {
