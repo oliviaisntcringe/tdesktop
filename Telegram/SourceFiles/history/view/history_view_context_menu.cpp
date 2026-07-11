@@ -1400,6 +1400,24 @@ ContextMenuRequest::ContextMenuRequest(
 : navigation(navigation) {
 }
 
+void AddReadTimeAction(
+		not_null<Ui::PopupMenu*> menu,
+		const ContextMenuRequest &request) {
+	const auto item = request.item;
+	if (!item || !item->out() || !item->isRegular()) {
+		return;
+	}
+	const auto date = item->history()->owner().outboxReadDate(item->fullId());
+	if (!date) {
+		return;
+	}
+	const auto when = base::unixtime::parse(date);
+	menu->addAction(
+		u"Read "_q + when.toString(u"d MMM, HH:mm"_q),
+		[] {},
+		&st::menuIconInfo);
+}
+
 void FillContextMenuItems(
 		not_null<Ui::PopupMenu*> result,
 		not_null<ListWidget*> list,
@@ -1426,6 +1444,7 @@ void FillContextMenuItems(
 		&& Api::WhoReactedExists(item, Api::WhoReactedList::All);
 
 	AddReplyToMessageAction(result, request, list);
+	AddReadTimeAction(result, request);
 	if (item) {
 		const auto media = item->media();
 		const auto document = media ? media->document() : nullptr;

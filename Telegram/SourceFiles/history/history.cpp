@@ -2214,7 +2214,25 @@ void History::inboxRead(not_null<const HistoryItem*> wasRead) {
 }
 
 void History::outboxRead(MsgId upTo) {
+	const auto wasReadTill = outboxReadTillId();
 	setOutboxReadTill(upTo);
+	// Record when our just-read outgoing messages were seen. Skip the first
+	// (sync) update, when the previous till isn't known yet (wasReadTill 0),
+	// so we don't stamp old messages with "now".
+	if (wasReadTill.bare > 0 && upTo > wasReadTill) {
+		const auto date = base::unixtime::now();
+		for (const auto &block : blocks) {
+			for (const auto &view : block->messages) {
+				const auto item = view->data();
+				if (item->out()
+					&& item->isRegular()
+					&& item->id > wasReadTill
+					&& item->id <= upTo) {
+					owner().setOutboxReadDate(item->fullId(), date);
+				}
+			}
+		}
+	}
 	if (const auto last = chatListMessage()) {
 		if (last->out() && last->isRegular() && last->id <= upTo) {
 			session().changes().messageUpdated(

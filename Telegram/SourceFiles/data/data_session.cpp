@@ -3062,6 +3062,15 @@ rpl::producer<not_null<HistoryItem*>> Session::messageDeletedKept() const {
 	return _messageDeletedKept.events();
 }
 
+void Session::setOutboxReadDate(FullMsgId itemId, TimeId date) {
+	_outboxReadDates[itemId] = date;
+}
+
+TimeId Session::outboxReadDate(FullMsgId itemId) const {
+	const auto i = _outboxReadDates.find(itemId);
+	return (i != end(_outboxReadDates)) ? i->second : TimeId(0);
+}
+
 void Session::removeDependencyMessage(not_null<HistoryItem*> item) {
 	const auto i = _dependentMessages.find(item);
 	if (i != end(_dependentMessages)) {

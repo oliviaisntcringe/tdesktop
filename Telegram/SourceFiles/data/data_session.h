@@ -397,6 +397,11 @@ public:
 	// Fires when an incoming message is deleted but kept (anti-delete).
 	[[nodiscard]] auto messageDeletedKept() const
 		-> rpl::producer<not_null<HistoryItem*>>;
+
+	// When your outgoing message was seen read (local receive time of the
+	// read-outbox update). 0 if unknown.
+	void setOutboxReadDate(FullMsgId itemId, TimeId date);
+	[[nodiscard]] TimeId outboxReadDate(FullMsgId itemId) const;
 	void notifyGiftUpdate(GiftUpdate &&update);
 	[[nodiscard]] rpl::producer<GiftUpdate> giftUpdates() const;
 	void notifyGiftsUpdate(GiftsUpdate &&update);
@@ -1190,6 +1195,7 @@ private:
 	rpl::event_stream<not_null<const ViewElement*>> _viewLayoutChanges;
 	rpl::event_stream<not_null<HistoryItem*>> _newItemAdded;
 	rpl::event_stream<not_null<HistoryItem*>> _messageDeletedKept;
+	base::flat_map<FullMsgId, TimeId> _outboxReadDates;
 	rpl::event_stream<GiftUpdate> _giftUpdates;
 	rpl::event_stream<GiftsUpdate> _giftsUpdates;
 	rpl::event_stream<GiftAuctionGot> _giftAuctionGots;
