@@ -65,6 +65,37 @@ void Appearance::setupContent() {
 	}
 
 	Ui::AddSkip(content);
+	Ui::AddSubsectionTitle(content, rpl::single(u"Ghost mode"_q));
+
+	const auto addGhost = [&](
+			const QString &label,
+			bool current,
+			Fn<void(bool)> apply) {
+		const auto button = AddButtonWithIcon(
+			content,
+			rpl::single(label),
+			st::settingsButton);
+		button->toggleOn(rpl::single(current));
+		button->toggledChanges(
+		) | rpl::on_next([=](bool value) {
+			apply(value);
+			Core::App().saveSettingsDelayed();
+		}, button->lifetime());
+	};
+	addGhost(
+		u"Don't send read receipts"_q,
+		Core::App().settings().ghostRead(),
+		[](bool v) { Core::App().settings().setGhostRead(v); });
+	addGhost(
+		u"Hide \"typing…\" status"_q,
+		Core::App().settings().ghostTyping(),
+		[](bool v) { Core::App().settings().setGhostTyping(v); });
+	addGhost(
+		u"Appear offline"_q,
+		Core::App().settings().ghostOnline(),
+		[](bool v) { Core::App().settings().setGhostOnline(v); });
+
+	Ui::AddSkip(content);
 
 	Ui::ResizeFitChild(this, content);
 }

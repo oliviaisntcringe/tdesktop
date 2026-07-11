@@ -52,6 +52,10 @@ inline constexpr auto kAccentColorKey = "accent-color"_cs;
 
 inline constexpr auto kScriptedPeersKey = "scripted-peers"_cs;
 
+inline constexpr auto kGhostReadKey = "ghost-read"_cs;
+inline constexpr auto kGhostTypingKey = "ghost-typing"_cs;
+inline constexpr auto kGhostOnlineKey = "ghost-online"_cs;
+
 struct WindowPosition {
 	int32 moncrc = 0;
 	int maximized = 0;
@@ -1062,6 +1066,14 @@ public:
 	[[nodiscard]] QColor accentColor();
 	[[nodiscard]] bool hasCustomAccentColor();
 	void setAccentColor(QColor color);
+
+	// Ghost mode: suppress outgoing read receipts / typing / online status.
+	[[nodiscard]] bool ghostRead();
+	void setGhostRead(bool value);
+	[[nodiscard]] bool ghostTyping();
+	void setGhostTyping(bool value);
+	[[nodiscard]] bool ghostOnline();
+	void setGhostOnline(bool value);
 
 	[[nodiscard]] QString chatScript(uint64 peerId);
 	void setChatScript(uint64 peerId, const QString &name);

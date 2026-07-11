@@ -14,6 +14,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "base/unixtime.h"
 #include "data/data_peer_values.h"
 #include "apiwrap.h"
+#include "core/application.h"
+#include "core/core_settings.h"
 
 namespace Api {
 namespace {
@@ -110,6 +112,9 @@ bool SendProgressManager::updated(const Key &key, bool doing) {
 
 void SendProgressManager::send(const Key &key, int progress) {
 	if (skipRequest(key)) {
+		return;
+	} else if (Core::App().settings().ghostTyping()) {
+		// Ghost mode: never broadcast a typing / recording / etc. status.
 		return;
 	}
 	using Type = SendProgressType;

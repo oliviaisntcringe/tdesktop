@@ -29,6 +29,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "history/history_item_helpers.h"
 #include "history/view/history_view_element.h"
 #include "core/application.h"
+#include "core/core_settings.h"
 #include "apiwrap.h"
 
 namespace Data {
@@ -697,6 +698,15 @@ void Histories::sendReadRequests() {
 
 void Histories::sendReadRequest(not_null<History*> history, State &state) {
 	Expects(state.willReadTill > state.sentReadTill);
+
+	if (Core::App().settings().ghostRead()) {
+		// Ghost mode: mark locally read but never tell the server, so the
+		// sender gets no read receipt.
+		state.sentReadTill = base::take(state.willReadTill);
+		state.willReadWhen = 0;
+		state.sentReadDone = true;
+		return;
+	}
 
 	const auto tillId = state.sentReadTill = base::take(state.willReadTill);
 	state.willReadWhen = 0;

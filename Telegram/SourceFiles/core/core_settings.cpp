@@ -1329,6 +1329,30 @@ bool Settings::hasCustomAccentColor() {
 	return !readPref<QString>(kAccentColorKey).isEmpty();
 }
 
+bool Settings::ghostRead() {
+	return readPref<bool>(kGhostReadKey);
+}
+
+void Settings::setGhostRead(bool value) {
+	writePref<bool>(kGhostReadKey, value);
+}
+
+bool Settings::ghostTyping() {
+	return readPref<bool>(kGhostTypingKey);
+}
+
+void Settings::setGhostTyping(bool value) {
+	writePref<bool>(kGhostTypingKey, value);
+}
+
+bool Settings::ghostOnline() {
+	return readPref<bool>(kGhostOnlineKey);
+}
+
+void Settings::setGhostOnline(bool value) {
+	writePref<bool>(kGhostOnlineKey, value);
+}
+
 QString Settings::chatScript(uint64 peerId) {
 	const auto prefix = QString::number(peerId) + u"="_q;
 	const auto parts = readPref<QString>(kScriptedPeersKey).split(
