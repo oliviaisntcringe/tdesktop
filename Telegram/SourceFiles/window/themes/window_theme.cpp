@@ -1339,38 +1339,30 @@ bool ApplyEditedPalette(const QByteArray &content) {
 }
 
 void ApplyAccentColor(QColor color) {
-	const auto set = [](const char *name, QColor c) {
-		style::main_palette::setColor(
-			QLatin1String(name),
-			uchar(c.red()),
-			uchar(c.green()),
-			uchar(c.blue()),
-			uchar(c.alpha()));
-	};
-	const auto bright = color;
-	const auto brightest = color.lighter(115);
-	const auto dim = color.darker(170);
-	const auto dimmer = color.darker(140);
-	set("windowFg", bright);
-	set("windowFgOver", brightest);
-	set("windowBoldFg", brightest);
-	set("windowBoldFgOver", brightest);
-	set("windowSubTextFg", dim);
-	set("windowSubTextFgOver", dimmer);
-	set("windowActiveTextFg", brightest);
-	set("windowBgActive", bright);
-	set("activeButtonBg", bright);
-	set("activeButtonBgOver", brightest);
-	set("dialogsBgActive", bright);
-	set("dialogsUnreadBg", bright);
-	set("dialogsNameFg", brightest);
-	set("dialogsDateFg", dim);
-	set("dialogsTextFg", dimmer);
-	set("msgInDateFg", dim);
-	set("msgOutDateFg", dim);
-	set("historyComposeAreaFg", bright);
-	set("titleFgActive", bright);
-	style::NotifyPaletteChanged();
+	// Recolor the WHOLE amber base palette to the chosen hue, so a custom
+	// accent fully reskins the CRT look instead of only a few colors. The
+	// amber palette is monochrome (everything is amber-tinted), so a hue
+	// shift from amber to the chosen color remaps it consistently; greys and
+	// blacks (near-zero saturation) are left untouched by the colorizer.
+	auto colorizer = style::colorizer();
+	colorizer.hueThreshold = 90;
+	colorizer.lightnessMin = 0;
+	colorizer.lightnessMax = 255;
+	QColor(u"#ffb000"_q).getHsv(
+		&colorizer.was.hue,
+		&colorizer.was.saturation,
+		&colorizer.was.value);
+	color.getHsv(
+		&colorizer.now.hue,
+		&colorizer.now.saturation,
+		&colorizer.now.value);
+
+	const auto content = readThemeContent(kNightThemeFile.utf16());
+	auto out = Instance();
+	if (LoadTheme(content, colorizer, std::nullopt, nullptr, &out)) {
+		style::main_palette::apply(out.palette);
+		style::NotifyPaletteChanged();
+	}
 }
 
 void KeepApplied() {
