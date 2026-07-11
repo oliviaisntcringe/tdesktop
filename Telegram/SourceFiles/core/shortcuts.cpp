@@ -143,6 +143,7 @@ const auto CommandByName = base::flat_map<QString, Command>{
 	{ u"workspace1"_q                    , Command::Workspace1 },
 	{ u"workspace2"_q                    , Command::Workspace2 },
 	{ u"scriptrun"_q                     , Command::ScriptRun },
+	{ u"matrixrain"_q                    , Command::MatrixRain },
 	//
 };
 
@@ -478,6 +479,7 @@ void Manager::fillDefaults() {
 
 	set(u"f1"_q, Command::Workspace1);
 	set(u"f2"_q, Command::Workspace2);
+	set(u"f3"_q, Command::MatrixRain);
 	set(u"f4"_q, Command::ScriptRun);
 
 	set(u"ctrl+w"_q, Command::Close);

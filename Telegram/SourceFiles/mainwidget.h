@@ -251,6 +251,7 @@ private:
 	void bootTick();
 	void setupWorkspaces();
 	void showScriptsWorkspace(bool show);
+	void toggleMatrixRain();
 	void setupScriptPanel();
 	[[nodiscard]] uint64 activeScriptedPeerId() const;
 	void updateMainSectionShown();
@@ -370,6 +371,8 @@ private:
 	object_ptr<Ui::RpWidget> _scriptPanel = { nullptr };
 	base::Timer _scriptTick;
 	base::Timer _scriptPreviewTimer;
+	object_ptr<Ui::RpWidget> _matrixOverlay = { nullptr };
+	base::Timer _matrixTimer;
 	crl::time _lastLoudAlert = 0;
 	object_ptr<Ui::PlainShadow> _thirdShadow = { nullptr };
 	object_ptr<Ui::ResizeArea> _firstColumnResizeArea = { nullptr };

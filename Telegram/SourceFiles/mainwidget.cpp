@@ -76,6 +76,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "base/qthelp_regex.h"
 #include "base/options.h"
 #include "base/call_delayed.h"
+#include "base/random.h"
 #include "mtproto/mtproto_dc_options.h"
 #include "core/update_checker.h"
 #include "core/shortcuts.h"
@@ -301,7 +302,7 @@ MainWidget::MainWidget(
 		p.drawText(
 			inner,
 			Qt::AlignVCenter | Qt::AlignLeft,
-			u"F1 chats    F2 scripts    F3 --    F10 quit"_q);
+			u"F1 chats    F2 scripts    F3 matrix    F10 quit"_q);
 		p.drawText(
 			inner,
 			Qt::AlignVCenter | Qt::AlignRight,
@@ -526,7 +527,80 @@ void MainWidget::setupWorkspaces() {
 			}
 			return true;
 		});
+		request->check(Command::MatrixRain, 1) && request->handle([=] {
+			toggleMatrixRain();
+			return true;
+		});
 	}, lifetime());
+}
+
+void MainWidget::toggleMatrixRain() {
+	if (_matrixOverlay) {
+		_matrixTimer.cancel();
+		_matrixOverlay.destroy();
+		return;
+	}
+	// Full-window rain over the body (covers folders strip too); any click
+	// or another F3 dismisses it.
+	_matrixOverlay.create(parentWidget());
+	const auto overlay = _matrixOverlay.data();
+	overlay->setGeometry(parentWidget()->rect());
+	overlay->raise();
+	overlay->show();
+
+	const auto font = st::windowFrameStatusFont;
+	const auto cell = std::max(int(font->height), 1);
+	const auto drops = std::make_shared<std::vector<int>>();
+
+	overlay->paintRequest() | rpl::on_next([=](QRect) {
+		auto p = QPainter(overlay);
+		p.fillRect(overlay->rect(), QColor(0, 0, 0));
+		p.setFont(font);
+		const auto cols = std::max(overlay->width() / cell, 1);
+		const auto rows = std::max(overlay->height() / cell, 1);
+		if (int(drops->size()) != cols) {
+			drops->resize(cols);
+			for (auto &d : *drops) {
+				d = base::RandomIndex(rows);
+			}
+		}
+		const auto glyphs = u"01<>[]{}=+*#$%&@ABCDEF0123456789"_q;
+		const auto head = st::windowBoldFg->c;
+		const auto body = st::windowFg->c;
+		for (auto x = 0; x != cols; ++x) {
+			const auto headY = (*drops)[x];
+			for (auto k = 0; k != 16; ++k) {
+				const auto y = headY - k;
+				if (y < 0 || y >= rows) {
+					continue;
+				}
+				auto color = (k == 0) ? head : body;
+				color.setAlpha((k == 0) ? 255 : std::max(230 - k * 15, 20));
+				p.setPen(color);
+				// Deterministic glyph per cell: stable columns, not TV noise.
+				const auto ch = glyphs.at(
+					(x * 92821 + y * 53) % int(glyphs.size()));
+				p.drawText(
+					QRect(x * cell, y * cell, cell, cell),
+					Qt::AlignCenter,
+					QString(ch));
+			}
+			(*drops)[x] += 1;
+			if ((*drops)[x] - 16 > rows && base::RandomIndex(20) == 0) {
+				(*drops)[x] = 0;
+			}
+		}
+	}, overlay->lifetime());
+
+	overlay->events() | rpl::on_next([=](not_null<QEvent*> e) {
+		if (e->type() == QEvent::MouseButtonPress) {
+			// Deferred: don't destroy the overlay inside its own event.
+			crl::on_main(this, [=] { toggleMatrixRain(); });
+		}
+	}, overlay->lifetime());
+
+	_matrixTimer.setCallback([=] { overlay->update(); });
+	_matrixTimer.callEach(70);
 }
 
 void MainWidget::showScriptsWorkspace(bool show) {

@@ -92,9 +92,8 @@ bool SkipTranslate(TextWithEntities textWithEntities) {
 	if (text.isEmpty()) {
 		return true;
 	}
-	if (!Core::App().settings().translateButtonEnabled()) {
-		return true;
-	}
+	// tuerlegram: always offer per-message translate (single-message
+	// translation is free), regardless of the translate-button setting.
 	constexpr auto kFirstChunk = size_t(100);
 	auto hasLetters = (text.size() >= kFirstChunk);
 	for (auto i = 0; i < kFirstChunk; i++) {
