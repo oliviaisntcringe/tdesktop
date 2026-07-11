@@ -369,6 +369,7 @@ private:
 	object_ptr<Ui::RpWidget> _scriptsOverlay = { nullptr };
 	object_ptr<Ui::RpWidget> _scriptPanel = { nullptr };
 	base::Timer _scriptTick;
+	base::Timer _scriptPreviewTimer;
 	crl::time _lastLoudAlert = 0;
 	object_ptr<Ui::PlainShadow> _thirdShadow = { nullptr };
 	object_ptr<Ui::ResizeArea> _firstColumnResizeArea = { nullptr };

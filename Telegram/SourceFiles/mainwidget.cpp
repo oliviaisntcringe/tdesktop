@@ -531,6 +531,7 @@ void MainWidget::setupWorkspaces() {
 
 void MainWidget::showScriptsWorkspace(bool show) {
 	if (!show) {
+		_scriptPreviewTimer.cancel();
 		_scriptsOverlay.destroy();
 		return;
 	} else if (_scriptsOverlay) {
@@ -649,6 +650,78 @@ void MainWidget::showScriptsWorkspace(bool show) {
 		Ui::Toast::Show(out.isEmpty() ? u"(no output)"_q : out.left(300));
 	});
 
+	// Live preview: run the editor code in a sandbox (no bound chat, so tg.*
+	// actions no-op) with its own in-memory state, driven by a timer so
+	// tick-based scripts animate; render state.html into a browser.
+	const auto preview = Ui::CreateChild<QTextBrowser>(overlay);
+	preview->setFrameShape(QFrame::NoFrame);
+	preview->setOpenExternalLinks(false);
+	preview->setOpenLinks(false);
+	preview->setStyleSheet(
+		u"QTextBrowser{background:%1;color:%2;border:none;}"_q.arg(
+			st::windowBg->c.name(),
+			st::windowSubTextFg->c.name()));
+	preview->show();
+
+	const auto previewState = std::make_shared<QString>(u"{}"_q);
+	const auto previewFrame = std::make_shared<int>(0);
+	const auto renderPreview = [=] {
+		if (!_scripts) {
+			return;
+		}
+		const auto type = (*previewFrame == 0) ? u"render"_q : u"tick"_q;
+		++*previewFrame;
+		const auto result = _scripts->preview(
+			editor->getLastText(),
+			u"{\"type\":\""_q + type + u"\"}"_q,
+			*previewState);
+		if (result.startsWith(u"error:"_q)) {
+			preview->setHtml(u"<div style=\"color:#ff5555;"
+				"font-family:monospace;padding:4px\">"_q
+				+ result.toHtmlEscaped() + u"</div>"_q);
+			return;
+		}
+		*previewState = result;
+		const auto object = QJsonDocument::fromJson(result.toUtf8()).object();
+		if (object.contains(u"html"_q)) {
+			preview->setHtml(object.value(u"html"_q).toString());
+		} else {
+			preview->setHtml(u"<pre>"_q + result.toHtmlEscaped() + u"</pre>"_q);
+		}
+	};
+	// Restart the sandbox whenever the code (or the loaded script) changes.
+	editor->changes() | rpl::on_next([=] {
+		*previewState = u"{}"_q;
+		*previewFrame = 0;
+	}, overlay->lifetime());
+	// Clicks in the preview drive the script, so you can play it right here.
+	QObject::connect(
+		preview,
+		&QTextBrowser::anchorClicked,
+		preview,
+		[=](const QUrl &url) {
+			if (!_scripts) {
+				return;
+			}
+			auto target = url.toString();
+			if (target.startsWith(u"tg://"_q)) {
+				target = target.mid(5);
+			}
+			auto event = QJsonObject();
+			event.insert(u"type"_q, u"click"_q);
+			event.insert(u"target"_q, target);
+			const auto result = _scripts->preview(
+				editor->getLastText(),
+				QString::fromUtf8(
+					QJsonDocument(event).toJson(QJsonDocument::Compact)),
+				*previewState);
+			if (!result.startsWith(u"error:"_q)) {
+				*previewState = result;
+			}
+		});
+	_scriptPreviewTimer.setCallback(renderPreview);
+	_scriptPreviewTimer.callEach(150);
+
 	sizeValue() | rpl::on_next([=](QSize size) {
 		overlay->setGeometry(QRect(QPoint(), size));
 
@@ -661,14 +734,16 @@ void MainWidget::showScriptsWorkspace(bool show) {
 		}
 
 		const auto editorLeft = pad + listWidth;
-		const auto editorWidth = std::max(
-			size.width() - editorLeft - pad,
-			0);
-		nameField->resize(editorWidth, nameField->height());
+		const auto rightWidth = std::max(size.width() - editorLeft - pad, 0);
+		// Split the right area: editor column | live preview column.
+		const auto colWidth = std::max((rightWidth - gap) / 2, 0);
+		const auto previewLeft = editorLeft + colWidth + gap;
+
+		nameField->resize(colWidth, nameField->height());
 		nameField->moveToLeft(editorLeft, headerHeight);
 
 		const auto buttonTop = size.height() - pad - save->height();
-		const auto quarter = std::max((editorWidth - 3 * gap) / 4, 0);
+		const auto quarter = std::max((colWidth - 3 * gap) / 4, 0);
 		save->resizeToWidth(quarter);
 		runBtn->resizeToWidth(quarter);
 		newBtn->resizeToWidth(quarter);
@@ -682,7 +757,12 @@ void MainWidget::showScriptsWorkspace(bool show) {
 		const auto editorHeight = std::max(
 			buttonTop - pad - editorTop,
 			int(font->height));
-		editor->setGeometry(editorLeft, editorTop, editorWidth, editorHeight);
+		editor->setGeometry(editorLeft, editorTop, colWidth, editorHeight);
+		preview->setGeometry(
+			previewLeft,
+			headerHeight,
+			std::max(size.width() - previewLeft - pad, 0),
+			std::max(size.height() - pad - headerHeight, int(font->height)));
 	}, overlay->lifetime());
 
 	overlay->paintRequest() | rpl::on_next([=](QRect) {
@@ -694,10 +774,13 @@ void MainWidget::showScriptsWorkspace(bool show) {
 			pad,
 			font->height + font->ascent,
 			u"SCRIPT LIBRARY   (F1 = chats)"_q);
-		p.drawText(
-			pad,
-			headerHeight - gap - font->height + font->ascent,
-			u"scripts:"_q);
+		const auto labelY = headerHeight - gap - font->height + font->ascent;
+		p.drawText(pad, labelY, u"scripts:"_q);
+		const auto editorLeft = pad + listWidth;
+		const auto rightWidth = std::max(overlay->width() - editorLeft - pad, 0);
+		const auto colWidth = std::max((rightWidth - gap) / 2, 0);
+		p.drawText(editorLeft, labelY, u"editor:"_q);
+		p.drawText(editorLeft + colWidth + gap, labelY, u"live preview:"_q);
 	}, overlay->lifetime());
 }
 

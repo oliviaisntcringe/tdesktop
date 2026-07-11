@@ -175,6 +175,17 @@ QString Manager::testRun(uint64 peerId, const QString &code) {
 	return _engine.run(code, u"{\"type\":\"run\"}"_q, readState(peerId));
 }
 
+QString Manager::preview(
+		const QString &code,
+		const QString &eventJson,
+		const QString &stateJson) {
+	_host.peerId = 0; // No bound chat: tg.* actions no-op in the preview.
+	return _engine.run(
+		code,
+		eventJson,
+		stateJson.isEmpty() ? u"{}"_q : stateJson);
+}
+
 QString Manager::libraryPath(const QString &name) const {
 	return cWorkingDir() + u"scripts/lib/"_q + name + u".js"_q;
 }

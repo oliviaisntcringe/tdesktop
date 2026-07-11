@@ -42,6 +42,13 @@ public:
 	// persisting — for the F2 test button. Returns the result or "error: ...".
 	QString testRun(uint64 peerId, const QString &code);
 
+	// Sandboxed run for the F2 live preview: no bound peer (tg.* actions are
+	// disabled), caller supplies+keeps the state, nothing is persisted.
+	QString preview(
+		const QString &code,
+		const QString &eventJson,
+		const QString &stateJson);
+
 	// Fires whenever any chat's state changes.
 	[[nodiscard]] rpl::producer<> updates() const;
 
