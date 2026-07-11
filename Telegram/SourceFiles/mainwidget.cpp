@@ -537,9 +537,11 @@ void MainWidget::showScriptsWorkspace(bool show) {
 	} else if (_scriptsOverlay) {
 		return;
 	}
-	_scriptsOverlay.create(this);
+	// Parent to the window body (not MainWidget) so the overlay also covers
+	// the folders strip, which is a body child sibling of MainWidget.
+	_scriptsOverlay.create(parentWidget());
 	const auto overlay = _scriptsOverlay.data();
-	overlay->setGeometry(rect());
+	overlay->setGeometry(parentWidget()->rect());
 	overlay->raise();
 	overlay->show();
 
@@ -722,7 +724,9 @@ void MainWidget::showScriptsWorkspace(bool show) {
 	_scriptPreviewTimer.setCallback(renderPreview);
 	_scriptPreviewTimer.callEach(150);
 
-	sizeValue() | rpl::on_next([=](QSize size) {
+	sizeValue() | rpl::on_next([=](QSize) {
+		// Lay out over the whole body (the overlay's parent), not MainWidget.
+		const auto size = parentWidget()->rect().size();
 		overlay->setGeometry(QRect(QPoint(), size));
 
 		auto y = headerHeight;
