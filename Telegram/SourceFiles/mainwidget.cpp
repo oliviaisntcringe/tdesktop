@@ -585,7 +585,7 @@ void MainWidget::toggleConsole() {
 
 	const auto endpoint = [] {
 		const auto stored = Core::App().settings().readPref<QString>(
-			kConsoleUrlKey);
+			Core::kConsoleUrlKey);
 		return stored.isEmpty() ? u"http://127.0.0.1:8000"_q : stored;
 	};
 	const auto localOnly = [](const QUrl &url) {
@@ -666,7 +666,7 @@ void MainWidget::toggleConsole() {
 			return;
 		} else if (cmd.startsWith(u":url "_q)) {
 			const auto addr = cmd.mid(5).trimmed();
-			Core::App().settings().writePref<QString>(kConsoleUrlKey, addr);
+			Core::App().settings().writePref<QString>(Core::kConsoleUrlKey, addr);
 			Core::App().saveSettingsDelayed();
 			echo(u"\n> endpoint = "_q + addr + u"\n"_q);
 			overlay->update();
