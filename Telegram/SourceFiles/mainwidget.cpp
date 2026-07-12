@@ -595,38 +595,37 @@ void MainWidget::toggleMusicPanel() {
 		rows->clear();
 		result.match([&](const MTPDmessages_botResults &data) {
 			for (const auto &entry : data.vresults().v) {
-				const auto media = entry.match([](
-						const MTPDbotInlineMediaResult &d) {
-					return d.vdocument();
-				}, [](const MTPDbotInlineResult &) {
-					return (const MTPDocument*)nullptr;
-				});
-				if (!media) {
-					continue;
-				}
-				const auto document = session().data().processDocument(*media);
-				if (!document->isSong() && !document->isAudioFile()) {
-					continue;
-				}
-				const auto song = document->song();
-				auto label = QString();
-				if (song && !song->title.isEmpty()) {
-					label = song->performer.isEmpty()
-						? song->title
-						: (song->performer + u" — "_q + song->title);
-				} else {
-					label = document->filename();
-				}
-				const auto button = Ui::CreateChild<Ui::RoundButton>(
-					overlay,
-					rpl::single(label.isEmpty() ? u"(track)"_q : label),
-					st::defaultLightButton);
-				button->show();
-				button->setClickedCallback([=] { play(document); });
-				rows->push_back(button);
 				if (rows->size() >= 20) {
 					break;
 				}
+				entry.match([&](const MTPDbotInlineMediaResult &d) {
+					const auto media = d.vdocument();
+					if (!media) {
+						return;
+					}
+					const auto document = session().data().processDocument(
+						*media);
+					if (!document->isSong() && !document->isAudioFile()) {
+						return;
+					}
+					const auto song = document->song();
+					auto label = QString();
+					if (song && !song->title.isEmpty()) {
+						label = song->performer.isEmpty()
+							? song->title
+							: (song->performer + u" — "_q + song->title);
+					} else {
+						label = document->filename();
+					}
+					const auto button = Ui::CreateChild<Ui::RoundButton>(
+						overlay,
+						rpl::single(label.isEmpty() ? u"(track)"_q : label),
+						st::defaultLightButton);
+					button->show();
+					button->setClickedCallback([=] { play(document); });
+					rows->push_back(button);
+				}, [](const MTPDbotInlineResult &) {
+				});
 			}
 		});
 		relayout();
@@ -653,15 +652,24 @@ void MainWidget::toggleMusicPanel() {
 		}
 		if (_loaditBot) {
 			query(_loaditBot, text);
-		} else {
-			_controller->resolveUsername(u"loaditbot"_q, [=](
-					not_null<PeerData*> peer) {
-				if (const auto bot = peer->asUser()) {
+			return;
+		}
+		session().api().request(MTPcontacts_ResolveUsername(
+			MTP_flags(0),
+			MTP_string(u"loaditbot"_q),
+			MTP_string(QString())
+		)).done([=](const MTPcontacts_ResolvedPeer &result) {
+			result.match([&](const MTPDcontacts_resolvedPeer &data) {
+				session().data().processUsers(data.vusers());
+				session().data().processChats(data.vchats());
+				const auto peer = session().data().peerLoaded(
+					peerFromMTP(data.vpeer()));
+				if (const auto bot = peer ? peer->asUser() : nullptr) {
 					_loaditBot = bot;
 					query(bot, text);
 				}
 			});
-		}
+		}).send();
 	};
 	search->submits() | rpl::on_next([=](Qt::KeyboardModifiers) {
 		doSearch();
