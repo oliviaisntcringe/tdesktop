@@ -94,6 +94,7 @@ enum class Command {
 	Workspace2,
 	ScriptRun,
 	MatrixRain,
+	MusicPanel,
 };
 
 [[maybe_unused]] constexpr auto kShowFolder = {

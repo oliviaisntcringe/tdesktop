@@ -15,6 +15,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 class HistoryWidget;
 class StackItem;
 class Image;
+class UserData;
 
 namespace Bot {
 struct SendCommandRequest;
@@ -252,6 +253,7 @@ private:
 	void setupWorkspaces();
 	void showScriptsWorkspace(bool show);
 	void toggleMatrixRain();
+	void toggleMusicPanel();
 	void setupScriptPanel();
 	[[nodiscard]] uint64 activeScriptedPeerId() const;
 	void updateMainSectionShown();
@@ -373,6 +375,8 @@ private:
 	base::Timer _scriptPreviewTimer;
 	object_ptr<Ui::RpWidget> _matrixOverlay = { nullptr };
 	base::Timer _matrixTimer;
+	object_ptr<Ui::RpWidget> _musicOverlay = { nullptr };
+	UserData *_loaditBot = nullptr;
 	crl::time _lastLoudAlert = 0;
 	object_ptr<Ui::PlainShadow> _thirdShadow = { nullptr };
 	object_ptr<Ui::ResizeArea> _firstColumnResizeArea = { nullptr };

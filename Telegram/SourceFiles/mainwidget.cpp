@@ -23,6 +23,10 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/data_channel.h"
 #include "data/data_chat.h"
 #include "data/data_user.h"
+#include "data/data_document.h"
+#include "data/data_audio_msg_id.h"
+#include "window/window_session_controller.h"
+#include "media/player/media_player_instance.h"
 #include "data/data_chat_filters.h"
 #include "data/data_file_origin.h"
 #include "data/data_histories.h"
@@ -302,7 +306,7 @@ MainWidget::MainWidget(
 		p.drawText(
 			inner,
 			Qt::AlignVCenter | Qt::AlignLeft,
-			u"F1 chats    F2 scripts    F3 matrix    F10 quit"_q);
+			u"F1 chats  F2 scripts  F3 matrix  F5 music  F10 quit"_q);
 		p.drawText(
 			inner,
 			Qt::AlignVCenter | Qt::AlignRight,
@@ -531,7 +535,155 @@ void MainWidget::setupWorkspaces() {
 			toggleMatrixRain();
 			return true;
 		});
+		request->check(Command::MusicPanel, 1) && request->handle([=] {
+			toggleMusicPanel();
+			return true;
+		});
 	}, lifetime());
+}
+
+void MainWidget::toggleMusicPanel() {
+	if (_musicOverlay) {
+		_musicOverlay.destroy();
+		return;
+	}
+	_musicOverlay.create(parentWidget());
+	const auto overlay = _musicOverlay.data();
+	overlay->setGeometry(parentWidget()->rect());
+	overlay->raise();
+	overlay->show();
+
+	const auto font = st::windowFrameStatusFont;
+	const auto pad = font->height * 2;
+	const auto headerHeight = font->height * 4;
+	const auto gap = font->height / 2;
+
+	const auto search = Ui::CreateChild<Ui::InputField>(
+		overlay,
+		st::defaultInputField,
+		Ui::InputField::Mode::SingleLine,
+		rpl::single(u"search music — @loaditbot"_q),
+		QString());
+	search->show();
+	search->setFocus();
+
+	const auto rows = std::make_shared<std::vector<Ui::RoundButton*>>();
+
+	const auto relayout = [=] {
+		const auto width = std::max(overlay->width() - 2 * pad, 0);
+		search->resize(width, search->height());
+		search->moveToLeft(pad, headerHeight);
+		auto y = headerHeight + search->height() + gap;
+		for (const auto row : *rows) {
+			row->resizeToWidth(width);
+			row->moveToLeft(pad, y);
+			y += row->height() + (gap / 2);
+		}
+	};
+
+	const auto play = [=](not_null<DocumentData*> document) {
+		Media::Player::instance()->playPause(AudioMsgId(
+			document,
+			FullMsgId(),
+			AudioMsgId::CreateExternalPlayId()));
+	};
+
+	const auto showResults = [=](const MTPmessages_BotResults &result) {
+		for (const auto row : *rows) {
+			delete row;
+		}
+		rows->clear();
+		result.match([&](const MTPDmessages_botResults &data) {
+			for (const auto &entry : data.vresults().v) {
+				const auto media = entry.match([](
+						const MTPDbotInlineMediaResult &d) {
+					return d.vdocument();
+				}, [](const MTPDbotInlineResult &) {
+					return (const MTPDocument*)nullptr;
+				});
+				if (!media) {
+					continue;
+				}
+				const auto document = session().data().processDocument(*media);
+				if (!document->isSong() && !document->isAudioFile()) {
+					continue;
+				}
+				const auto song = document->song();
+				auto label = QString();
+				if (song && !song->title.isEmpty()) {
+					label = song->performer.isEmpty()
+						? song->title
+						: (song->performer + u" — "_q + song->title);
+				} else {
+					label = document->filename();
+				}
+				const auto button = Ui::CreateChild<Ui::RoundButton>(
+					overlay,
+					rpl::single(label.isEmpty() ? u"(track)"_q : label),
+					st::defaultLightButton);
+				button->show();
+				button->setClickedCallback([=] { play(document); });
+				rows->push_back(button);
+				if (rows->size() >= 20) {
+					break;
+				}
+			}
+		});
+		relayout();
+	};
+
+	const auto query = [=](not_null<UserData*> bot, const QString &text) {
+		session().api().request(MTPmessages_GetInlineBotResults(
+			MTP_flags(0),
+			bot->inputUser(),
+			session().user()->input(),
+			MTPInputGeoPoint(),
+			MTP_string(text),
+			MTP_string(QString())
+		)).done(crl::guard(overlay, [=](
+				const MTPmessages_BotResults &result) {
+			showResults(result);
+		})).send();
+	};
+
+	const auto doSearch = [=] {
+		const auto text = search->getLastText().trimmed();
+		if (text.isEmpty()) {
+			return;
+		}
+		if (_loaditBot) {
+			query(_loaditBot, text);
+		} else {
+			_controller->resolveUsername(u"loaditbot"_q, [=](
+					not_null<PeerData*> peer) {
+				if (const auto bot = peer->asUser()) {
+					_loaditBot = bot;
+					query(bot, text);
+				}
+			});
+		}
+	};
+	search->submits() | rpl::on_next([=](Qt::KeyboardModifiers) {
+		doSearch();
+	}, overlay->lifetime());
+
+	sizeValue() | rpl::on_next([=](QSize) {
+		overlay->setGeometry(parentWidget()->rect());
+		relayout();
+	}, overlay->lifetime());
+
+	overlay->paintRequest() | rpl::on_next([=](QRect) {
+		auto p = QPainter(overlay);
+		p.fillRect(overlay->rect(), st::windowBg);
+		p.setFont(font);
+		p.setPen(st::windowSubTextFg->c);
+		p.drawText(
+			pad,
+			font->height + font->ascent,
+			u"MUSIC  (F5)   type & Enter — @loaditbot"_q);
+	}, overlay->lifetime());
+
+	relayout();
 }
 
 void MainWidget::toggleMatrixRain() {
