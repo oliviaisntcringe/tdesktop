@@ -565,8 +565,10 @@ void MainWidget::toggleMatrixRain() {
 			}
 		}
 		const auto glyphs = u"01<>[]{}=+*#$%&@ABCDEF0123456789"_q;
-		const auto head = st::windowBoldFg->c;
-		const auto body = st::windowFg->c;
+		// Rain follows the chosen accent color (bright head, accent trail).
+		const auto accent = Core::App().settings().accentColor();
+		const auto head = accent.lighter(160);
+		const auto body = accent;
 		for (auto x = 0; x != cols; ++x) {
 			const auto headY = (*drops)[x];
 			for (auto k = 0; k != 16; ++k) {
