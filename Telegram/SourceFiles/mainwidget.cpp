@@ -113,6 +113,9 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include <QtCore/QJsonObject>
 #include <QtWidgets/QApplication>
 #include <QtWidgets/QTextBrowser>
+#include <QtWidgets/QScrollBar>
+#include <QtNetwork/QNetworkAccessManager>
+#include <QtNetwork/QNetworkReply>
 
 namespace {
 
@@ -306,7 +309,7 @@ MainWidget::MainWidget(
 		p.drawText(
 			inner,
 			Qt::AlignVCenter | Qt::AlignLeft,
-			u"F1 chats  F2 scripts  F3 matrix  F5 music  F10 quit"_q);
+			u"F1 chats  F2 scripts  F3 matrix  F5 music  F6 console"_q);
 		p.drawText(
 			inner,
 			Qt::AlignVCenter | Qt::AlignRight,
@@ -539,7 +542,168 @@ void MainWidget::setupWorkspaces() {
 			toggleMusicPanel();
 			return true;
 		});
+		request->check(Command::Console, 1) && request->handle([=] {
+			toggleConsole();
+			return true;
+		});
 	}, lifetime());
+}
+
+void MainWidget::toggleConsole() {
+	if (_consoleOverlay) {
+		_consoleTypeTimer.cancel();
+		_consoleOverlay.destroy();
+		return;
+	}
+	_consoleOverlay.create(parentWidget());
+	const auto overlay = _consoleOverlay.data();
+	overlay->setGeometry(parentWidget()->rect());
+	overlay->raise();
+	overlay->show();
+
+	const auto font = st::windowFrameStatusFont;
+	const auto pad = font->height * 2;
+	const auto headerHeight = font->height * 4;
+	const auto gap = font->height / 2;
+
+	const auto input = Ui::CreateChild<Ui::InputField>(
+		overlay,
+		st::defaultInputField,
+		Ui::InputField::Mode::SingleLine,
+		rpl::single(u"command + Enter   (:url <addr> to point, :clear)"_q),
+		QString());
+	input->show();
+	input->setFocus();
+
+	const auto output = Ui::CreateChild<QTextBrowser>(overlay);
+	output->setFrameShape(QFrame::NoFrame);
+	output->setStyleSheet(
+		u"QTextBrowser{background:#050805;color:%1;border:none;"
+		"font-family:monospace;}"_q.arg(
+			Core::App().settings().accentColor().name()));
+	output->show();
+
+	const auto endpoint = [] {
+		const auto stored = Core::App().settings().readPref<QString>(
+			kConsoleUrlKey);
+		return stored.isEmpty() ? u"http://127.0.0.1:8000"_q : stored;
+	};
+	const auto localOnly = [](const QUrl &url) {
+		const auto h = url.host();
+		if (h == u"localhost"_q
+			|| h == u"127.0.0.1"_q
+			|| h == u"::1"_q
+			|| h.endsWith(u".local"_q)
+			|| h.startsWith(u"192.168."_q)
+			|| h.startsWith(u"10."_q)
+			|| h.startsWith(u"127."_q)) {
+			return true;
+		}
+		if (h.startsWith(u"172."_q)) {
+			const auto parts = h.split('.');
+			if (parts.size() >= 2) {
+				const auto second = parts[1].toInt();
+				return (second >= 16 && second <= 31);
+			}
+		}
+		return false;
+	};
+
+	const auto manager = new QNetworkAccessManager(overlay);
+	const auto buffer = std::make_shared<QString>();
+	const auto shown = std::make_shared<int>(0);
+
+	const auto render = [=] {
+		output->setHtml(u"<pre>"_q
+			+ buffer->left(*shown).toHtmlEscaped()
+			+ u"</pre>"_q);
+		const auto bar = output->verticalScrollBar();
+		bar->setValue(bar->maximum());
+	};
+	_consoleTypeTimer.setCallback([=] {
+		if (*shown < int(buffer->size())) {
+			*shown = std::min(*shown + 3, int(buffer->size()));
+			render();
+		} else {
+			_consoleTypeTimer.cancel();
+		}
+	});
+	const auto echo = [=](const QString &text) {
+		*buffer += text;
+		*shown = int(buffer->size());
+		render();
+	};
+	const auto typeOut = [=](const QString &text) {
+		*buffer += text;
+		_consoleTypeTimer.callEach(20);
+	};
+
+	const auto send = [=](const QString &cmd) {
+		const auto url = QUrl(endpoint());
+		if (!localOnly(url)) {
+			echo(u"\n[blocked: only localhost / LAN endpoints allowed]\n"_q);
+			return;
+		}
+		auto request = QNetworkRequest(url);
+		request.setHeader(
+			QNetworkRequest::ContentTypeHeader,
+			"text/plain; charset=utf-8");
+		const auto reply = manager->post(request, cmd.toUtf8());
+		QObject::connect(reply, &QNetworkReply::finished, crl::guard(overlay, [=] {
+			const auto ok = (reply->error() == QNetworkReply::NoError);
+			const auto body = ok
+				? QString::fromUtf8(reply->readAll())
+				: (u"[error: "_q + reply->errorString() + u"]"_q);
+			reply->deleteLater();
+			typeOut(u"\n"_q + body + u"\n"_q);
+		}));
+	};
+
+	input->submits() | rpl::on_next([=](Qt::KeyboardModifiers) {
+		const auto cmd = input->getLastText().trimmed();
+		input->setText(QString());
+		if (cmd.isEmpty()) {
+			return;
+		} else if (cmd.startsWith(u":url "_q)) {
+			const auto addr = cmd.mid(5).trimmed();
+			Core::App().settings().writePref<QString>(kConsoleUrlKey, addr);
+			Core::App().saveSettingsDelayed();
+			echo(u"\n> endpoint = "_q + addr + u"\n"_q);
+			overlay->update();
+			return;
+		} else if (cmd == u":clear"_q) {
+			*buffer = QString();
+			*shown = 0;
+			render();
+			return;
+		}
+		echo(u"\n$ "_q + cmd);
+		send(cmd);
+	}, overlay->lifetime());
+
+	sizeValue() | rpl::on_next([=](QSize) {
+		overlay->setGeometry(parentWidget()->rect());
+		const auto width = std::max(overlay->width() - 2 * pad, 0);
+		input->resize(width, input->height());
+		input->moveToLeft(pad, headerHeight);
+		const auto top = headerHeight + input->height() + gap;
+		output->setGeometry(
+			pad,
+			top,
+			width,
+			std::max(overlay->height() - top - pad, int(font->height)));
+	}, overlay->lifetime());
+
+	overlay->paintRequest() | rpl::on_next([=](QRect) {
+		auto p = QPainter(overlay);
+		p.fillRect(overlay->rect(), st::windowBg);
+		p.setFont(font);
+		p.setPen(st::windowSubTextFg->c);
+		p.drawText(
+			pad,
+			font->height + font->ascent,
+			u"CONSOLE  (F6)   → "_q + endpoint());
+	}, overlay->lifetime());
 }
 
 void MainWidget::toggleMusicPanel() {

@@ -56,6 +56,8 @@ inline constexpr auto kGhostReadKey = "ghost-read"_cs;
 inline constexpr auto kGhostTypingKey = "ghost-typing"_cs;
 inline constexpr auto kGhostOnlineKey = "ghost-online"_cs;
 
+inline constexpr auto kConsoleUrlKey = "console-url"_cs;
+
 struct WindowPosition {
 	int32 moncrc = 0;
 	int maximized = 0;

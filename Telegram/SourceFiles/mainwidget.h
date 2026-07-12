@@ -254,6 +254,7 @@ private:
 	void showScriptsWorkspace(bool show);
 	void toggleMatrixRain();
 	void toggleMusicPanel();
+	void toggleConsole();
 	void setupScriptPanel();
 	[[nodiscard]] uint64 activeScriptedPeerId() const;
 	void updateMainSectionShown();
@@ -377,6 +378,8 @@ private:
 	base::Timer _matrixTimer;
 	object_ptr<Ui::RpWidget> _musicOverlay = { nullptr };
 	UserData *_loaditBot = nullptr;
+	object_ptr<Ui::RpWidget> _consoleOverlay = { nullptr };
+	base::Timer _consoleTypeTimer;
 	crl::time _lastLoudAlert = 0;
 	object_ptr<Ui::PlainShadow> _thirdShadow = { nullptr };
 	object_ptr<Ui::ResizeArea> _firstColumnResizeArea = { nullptr };
