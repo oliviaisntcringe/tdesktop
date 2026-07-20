@@ -21,6 +21,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "boxes/download_path_box.h"
 #include "core/application.h"
 #include "core/core_settings.h"
+
+#include <QtCore/QProcess>
 #include "core/file_utilities.h"
 #include "core/launcher.h"
 #include "core/update_checker.h"
@@ -1166,6 +1168,15 @@ void BuildUpdateSection(SectionBuilder &builder, bool atTop) {
 		setDefaultStatus(checker);
 
 		update->setClickedCallback([] {
+			// A signed installer package (verified on download) runs the
+			// installer on this explicit user click, then quits so it can
+			// apply; the installer shows its own confirmation window.
+			const auto installer = Core::FleetInstallerPath();
+			if (!installer.isEmpty()) {
+				QProcess::startDetached(installer, QStringList());
+				Core::Quit();
+				return;
+			}
 			if (!Core::UpdaterDisabled()) {
 				Core::checkReadyUpdate();
 			}

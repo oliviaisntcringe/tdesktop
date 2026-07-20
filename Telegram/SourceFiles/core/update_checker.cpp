@@ -1752,12 +1752,27 @@ bool UpdateChecker::percent() const {
 //	return QString::fromWCharArray(errMsg);
 //}
 
+QString FleetInstallerPath() {
+	const auto ready = cWorkingDir() + u"tupdates/temp/ready"_q;
+	const auto installer = cWorkingDir()
+		+ u"tupdates/temp/tuerlegram_setup.exe"_q;
+	return (QFile(ready).exists() && QFile(installer).exists())
+		? installer
+		: QString();
+}
+
 bool checkReadyUpdate() {
 	QString readyFilePath = cWorkingDir() + u"tupdates/temp/ready"_q, readyPath = cWorkingDir() + u"tupdates/temp"_q;
 	if (!QFile(readyFilePath).exists() || cExeName().isEmpty()) {
 		if (QDir(cWorkingDir() + u"tupdates/ready"_q).exists() || QDir(cWorkingDir() + u"tupdates/temp"_q).exists()) {
 			ClearAll();
 		}
+		return false;
+	}
+
+	// A signed fleet installer package is applied only on explicit user
+	// consent (running the installer), never auto-swapped at startup.
+	if (!FleetInstallerPath().isEmpty()) {
 		return false;
 	}
 

@@ -54,6 +54,13 @@ private:
 };
 
 bool checkReadyUpdate();
+
+// If a signature-verified update package contains a fleet installer
+// (tupdates/temp/tuerlegram_setup.exe), returns its path — else empty. Such
+// packages are applied by running the installer on explicit user consent,
+// never auto-swapped.
+[[nodiscard]] QString FleetInstallerPath();
+
 void UpdateApplication();
 QString countAlphaVersionSignature(uint64 version);
 
