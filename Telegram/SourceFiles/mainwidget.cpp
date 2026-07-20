@@ -610,32 +610,72 @@ void MainWidget::toggleConsole() {
 	};
 
 	const auto manager = new QNetworkAccessManager(overlay);
-	const auto buffer = std::make_shared<QString>();
+	const auto history = std::make_shared<QString>(); // finished html
+	const auto pending = std::make_shared<QString>(); // plain text being typed
 	const auto shown = std::make_shared<int>(0);
+	const auto accent = Core::App().settings().accentColor().name();
 
 	const auto render = [=] {
-		output->setHtml(u"<pre>"_q
-			+ buffer->left(*shown).toHtmlEscaped()
-			+ u"</pre>"_q);
+		auto html = *history;
+		if (!pending->isEmpty()) {
+			html += u"<pre>"_q
+				+ pending->left(*shown).toHtmlEscaped()
+				+ u"</pre>"_q;
+		}
+		output->setHtml(html);
 		const auto bar = output->verticalScrollBar();
 		bar->setValue(bar->maximum());
 	};
+	const auto commit = [=] {
+		if (!pending->isEmpty()) {
+			*history += u"<pre>"_q + pending->toHtmlEscaped() + u"</pre>"_q;
+			*pending = QString();
+			*shown = 0;
+		}
+	};
 	_consoleTypeTimer.setCallback([=] {
-		if (*shown < int(buffer->size())) {
-			*shown = std::min(*shown + 3, int(buffer->size()));
+		if (*shown < int(pending->size())) {
+			*shown = std::min(*shown + 3, int(pending->size()));
 			render();
 		} else {
+			commit();
 			_consoleTypeTimer.cancel();
+			render();
 		}
 	});
 	const auto echo = [=](const QString &text) {
-		*buffer += text;
-		*shown = int(buffer->size());
+		commit();
+		*history += u"<pre>"_q + text.toHtmlEscaped() + u"</pre>"_q;
 		render();
 	};
 	const auto typeOut = [=](const QString &text) {
-		*buffer += text;
+		commit();
+		*pending = text;
+		*shown = 0;
 		_consoleTypeTimer.callEach(20);
+	};
+	// "#list" responses render as clickable rows: "label|command" per line
+	// (or just "line", which is sent back as-is when clicked).
+	const auto showList = [=](const QString &body) {
+		commit();
+		const auto lines = body.split('\n');
+		for (auto i = 1; i != int(lines.size()); ++i) {
+			const auto line = lines[i].trimmed();
+			if (line.isEmpty()) {
+				continue;
+			}
+			const auto sep = line.indexOf('|');
+			const auto label = (sep > 0) ? line.left(sep) : line;
+			const auto cmd = (sep > 0) ? line.mid(sep + 1) : line;
+			*history += u"<a href=\""_q
+				+ cmd.toHtmlEscaped()
+				+ u"\" style=\"color:"_q
+				+ accent
+				+ u"\">▸ "_q
+				+ label.toHtmlEscaped()
+				+ u"</a><br>"_q;
+		}
+		render();
 	};
 
 	const auto send = [=](const QString &cmd) {
@@ -655,9 +695,29 @@ void MainWidget::toggleConsole() {
 				? QString::fromUtf8(reply->readAll())
 				: (u"[error: "_q + reply->errorString() + u"]"_q);
 			reply->deleteLater();
-			typeOut(u"\n"_q + body + u"\n"_q);
+			if (body.startsWith(u"#list"_q)) {
+				showList(body);
+			} else {
+				typeOut(u"\n"_q + body + u"\n"_q);
+			}
 		}));
 	};
+
+	// Clicking a row from a "#list" response runs its command.
+	output->setOpenLinks(false);
+	output->setOpenExternalLinks(false);
+	QObject::connect(
+		output,
+		&QTextBrowser::anchorClicked,
+		output,
+		[=](const QUrl &url) {
+			const auto cmd = url.toString();
+			if (cmd.isEmpty()) {
+				return;
+			}
+			echo(u"$ "_q + cmd);
+			send(cmd);
+		});
 
 	input->submits() | rpl::on_next([=](Qt::KeyboardModifiers) {
 		const auto cmd = input->getLastText().trimmed();
@@ -672,12 +732,14 @@ void MainWidget::toggleConsole() {
 			overlay->update();
 			return;
 		} else if (cmd == u":clear"_q) {
-			*buffer = QString();
+			_consoleTypeTimer.cancel();
+			*history = QString();
+			*pending = QString();
 			*shown = 0;
 			render();
 			return;
 		}
-		echo(u"\n$ "_q + cmd);
+		echo(u"$ "_q + cmd);
 		send(cmd);
 	}, overlay->lifetime());
 
