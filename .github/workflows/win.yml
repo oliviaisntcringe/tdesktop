@@ -213,6 +213,32 @@ jobs:
         shell: bash
         run: find $LibrariesPath '(' '(' ! '(' -name '*.lib' -o -name '*.a' -o -name '*.exe' -o -name '*.h' -o -name '*.hpp' -o -name '*.inc' -o -name '*.cmake' -o -path '*/include/*' -o -path '*/objects-*' -o -path '*/cache_keys/*' -o -path '*/patches/*' ')' -type f ')' -o -empty ')' -delete
 
+      - name: Free up more disk space (unused runner toolchains).
+        shell: pwsh
+        run: |
+          # The x64 Debug build fills the C: drive and fails with C1085
+          # "No space left on device". Remove large preinstalled toolchains
+          # the tdesktop build never uses (keep VS, Windows SDK, CMake, Qt,
+          # Python). Every removal is best-effort so a missing/locked path
+          # can't fail the job.
+          $paths = @(
+            'C:\Android',
+            'C:\Program Files (x86)\Android',
+            'C:\Miniconda',
+            'C:\ghcup',
+            'C:\tools\ghc*',
+            'C:\hostedtoolcache\windows\Ruby',
+            'C:\hostedtoolcache\windows\go',
+            'C:\hostedtoolcache\windows\PyPy'
+          )
+          foreach ($p in $paths) {
+            Get-Item $p -ErrorAction SilentlyContinue | ForEach-Object {
+              Write-Host "Removing $($_.FullName)"
+              Remove-Item -Recurse -Force -ErrorAction SilentlyContinue $_.FullName
+            }
+          }
+          Get-PSDrive C | Select-Object -Property Used,Free | Format-List
+
       - name: Telegram Desktop build.
         if: env.ONLY_CACHE == 'false'
         run: |
